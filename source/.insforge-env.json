@@ -1,0 +1,1 @@
+{"DATABASE_URL":"file:./prisma/dev.db","JWT_SECRET":"2716a07c84d62511599506a715ae558bd16278c5db1a20655b93592ed22d7227","NODE_ENV":"production"}

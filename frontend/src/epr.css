@@ -1,0 +1,4 @@
+/* Tailwind v4 utilities only — no preflight, preserves existing app styles */
+@layer theme, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);

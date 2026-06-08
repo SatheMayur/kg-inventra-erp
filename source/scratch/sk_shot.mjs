@@ -1,0 +1,14 @@
+import puppeteer from 'puppeteer';
+const url = process.argv[2] || 'http://localhost:3001/';
+const out = process.argv[3] || 'scratch/sk_home.png';
+const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 1366, height: 900 });
+const resp = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+console.log('status:', resp?.status(), 'final:', page.url());
+await page.screenshot({ path: out, fullPage: false });
+const title = await page.title();
+const bodyText = await page.evaluate(() => document.body.innerText.slice(0, 300));
+console.log('title:', JSON.stringify(title));
+console.log('body[0..300]:', JSON.stringify(bodyText));
+await browser.close();

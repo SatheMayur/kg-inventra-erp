@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FG Inventory — Project Status Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #fff;
+    color: #0f172a;
+    font-size: 12px;
+    line-height: 1.5;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ── COVER PAGE ── */
+  .cover {
+    min-height: 100vh;
+    background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 40px;
+    text-align: center;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%);
+  }
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -100px; left: -100px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 70%);
+  }
+  .cover-logo {
+    width: 72px; height: 72px;
+    background: #F59E0B;
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: 900; color: #0f172a;
+    margin: 0 auto 24px;
+    position: relative; z-index: 1;
+    letter-spacing: -1px;
+  }
+  .cover-tag {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #F59E0B; margin-bottom: 16px;
+    position: relative; z-index: 1;
+  }
+  .cover-title {
+    font-size: 42px; font-weight: 900; color: #fff;
+    letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 16px;
+    position: relative; z-index: 1;
+  }
+  .cover-sub {
+    font-size: 16px; color: rgba(255,255,255,0.55); margin-bottom: 48px;
+    position: relative; z-index: 1;
+  }
+  .cover-meta {
+    display: flex; gap: 40px; justify-content: center;
+    position: relative; z-index: 1;
+  }
+  .cover-meta-item { text-align: center; }
+  .cover-meta-label { font-size: 10px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .cover-meta-value { font-size: 14px; color: #fff; font-weight: 600; }
+  .cover-divider {
+    width: 60px; height: 2px; background: rgba(245,158,11,0.4);
+    margin: 40px auto; position: relative; z-index: 1;
+  }
+
+  /* ── PAGES ── */
+  .page {
+    padding: 48px 52px;
+    page-break-after: always;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .page:last-child { page-break-after: auto; }
+
+  /* ── SECTION HEADER ── */
+  .section-eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: #F59E0B; margin-bottom: 6px;
+  }
+  .section-title {
+    font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .section-desc {
+    font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 32px;
+    max-width: 600px;
+  }
+  .section-rule {
+    height: 2px;
+    background: linear-gradient(to right, #F59E0B, transparent);
+    margin-bottom: 32px;
+    border-radius: 1px;
+  }
+
+  /* ── STATUS CARD ── */
+  .card-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .card-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .card {
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 20px; position: relative; overflow: hidden;
+  }
+  .card.accent-amber { border-left: 4px solid #F59E0B; }
+  .card.accent-green  { border-left: 4px solid #10b981; }
+  .card.accent-blue   { border-left: 4px solid #3b82f6; }
+  .card.accent-purple { border-left: 4px solid #8b5cf6; }
+  .card.accent-red    { border-left: 4px solid #ef4444; }
+  .card.accent-cyan   { border-left: 4px solid #06b6d4; }
+  .card-icon { font-size: 22px; margin-bottom: 10px; }
+  .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin-bottom: 6px; }
+  .card-value { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -1px; line-height: 1; margin-bottom: 4px; }
+  .card-body { font-size: 12px; color: #475569; line-height: 1.5; }
+
+  /* ── TIMELINE ── */
+  .timeline { margin-bottom: 28px; }
+  .timeline-item {
+    display: flex; gap: 16px; margin-bottom: 20px; position: relative;
+  }
+  .timeline-item::before {
+    content: ''; position: absolute;
+    left: 15px; top: 32px; bottom: -20px; width: 2px;
+    background: #e2e8f0;
+  }
+  .timeline-item:last-child::before { display: none; }
+  .timeline-dot {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; z-index: 1;
+  }
+  .dot-done    { background: #dcfce7; color: #16a34a; }
+  .dot-active  { background: #fef9c3; color: #ca8a04; }
+  .dot-pending { background: #f1f5f9; color: #94a3b8; }
+  .timeline-content { flex: 1; padding-top: 4px; }
+  .timeline-label {
+    font-size: 13px; font-weight: 700; color: #0f172a; margin-bottom: 2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .timeline-sub { font-size: 11px; color: #64748b; line-height: 1.5; }
+
+  /* ── BADGE ── */
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .badge-done    { background: #dcfce7; color: #16a34a; }
+  .badge-active  { background: #fef9c3; color: #ca8a04; }
+  .badge-pending { background: #f1f5f9; color: #64748b; }
+  .badge-critical{ background: #fee2e2; color: #dc2626; }
+
+  /* ── TABLE ── */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  th {
+    background: #0f172a; color: #fff; padding: 10px 12px;
+    text-align: left; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child  { border-radius: 0 8px 0 0; }
+  td {
+    padding: 9px 12px; border-bottom: 1px solid #f1f5f9;
+    font-size: 11px; color: #374151; vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:hover td { background: #fffbeb; }
+  .skill-expert   { color: #16a34a; font-weight: 700; }
+  .skill-advanced { color: #2563eb; font-weight: 700; }
+  .skill-inter    { color: #7c3aed; font-weight: 700; }
+
+  /* ── FEATURE LIST ── */
+  .feature-list { list-style: none; margin-bottom: 20px; }
+  .feature-list li {
+    padding: 8px 12px; margin-bottom: 6px; border-radius: 8px;
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: #374151;
+  }
+  .feature-list li .fi { flex-shrink: 0; font-size: 14px; }
+  .feature-list li strong { color: #0f172a; }
+
+  /* ── ARCHITECTURE BOX ── */
+  .arch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  .arch-box {
+    border-radius: 10px; padding: 14px 12px; text-align: center;
+    border: 1px solid;
+  }
+  .arch-box.frontend  { background: #eff6ff; border-color: #bfdbfe; }
+  .arch-box.backend   { background: #f0fdf4; border-color: #bbf7d0; }
+  .arch-box.database  { background: #fefce8; border-color: #fde68a; }
+  .arch-box.infra     { background: #fdf4ff; border-color: #e9d5ff; }
+  .arch-box-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .arch-box.frontend  .arch-box-title { color: #1d4ed8; }
+  .arch-box.backend   .arch-box-title { color: #15803d; }
+  .arch-box.database  .arch-box-title { color: #a16207; }
+  .arch-box.infra     .arch-box-title { color: #7e22ce; }
+  .arch-tag {
+    display: inline-block; margin: 2px; padding: 2px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 600;
+  }
+  .arch-box.frontend  .arch-tag { background: #dbeafe; color: #1e40af; }
+  .arch-box.backend   .arch-tag { background: #dcfce7; color: #166534; }
+  .arch-box.database  .arch-tag { background: #fef9c3; color: #854d0e; }
+  .arch-box.infra     .arch-tag { background: #f3e8ff; color: #6b21a8; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-row { margin-bottom: 14px; }
+  .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .progress-label { font-size: 12px; font-weight: 600; color: #374151; }
+  .progress-pct   { font-size: 11px; font-weight: 700; color: #F59E0B; }
+  .progress-track { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
+  .progress-fill  { height: 100%; border-radius: 4px; background: linear-gradient(to right, #F59E0B, #f97316); }
+  .progress-fill.blue   { background: linear-gradient(to right, #3b82f6, #6366f1); }
+  .progress-fill.green  { background: linear-gradient(to right, #10b981, #059669); }
+  .progress-fill.purple { background: linear-gradient(to right, #8b5cf6, #a855f7); }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: auto; padding-top: 24px; border-top: 1px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-left  { font-size: 10px; color: #94a3b8; }
+  .footer-right { font-size: 10px; color: #94a3b8; }
+  .footer-logo  { font-size: 11px; font-weight: 800; color: #F59E0B; }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  .compare-table th {
+    padding: 10px 14px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .compare-table th.before { background: #ef4444; color: #fff; border-radius: 8px 0 0 0; }
+  .compare-table th.feature { background: #0f172a; color: #fff; }
+  .compare-table th.after  { background: #10b981; color: #fff; border-radius: 0 8px 0 0; }
+  .compare-table td {
+    padding: 9px 14px; border-bottom: 1px solid #f1f5f9; font-size: 11px; vertical-align: top;
+  }
+  .compare-table td.before { background: #fff5f5; color: #dc2626; }
+  .compare-table td.feature { background: #f8fafc; font-weight: 700; color: #0f172a; }
+  .compare-table td.after  { background: #f0fdf4; color: #15803d; }
+
+  @media print {
+    body { font-size: 11px; }
+    .page { padding: 36px 44px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- COVER                                                          -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">FG</div>
+  <div class="cover-tag">Project Status Report · May 2026</div>
+  <div class="cover-title">FG Inventory<br/>Management System</div>
+  <div class="cover-sub">AI-Powered Food &amp; Grains ERP — Build Progress &amp; Technical Overview</div>
+  <div class="cover-divider"></div>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Coordinator</div>
+      <div class="cover-meta-value">Prachi</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Phase</div>
+      <div class="cover-meta-value">3 of 4</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Date</div>
+      <div class="cover-meta-value">25 May 2026</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Status</div>
+      <div class="cover-meta-value" style="color:#F59E0B;">Active Build</div>
+    </div>
+    <div class="cover-meta-item">
+      <div class="cover-meta-label">Classification</div>
+      <div class="cover-meta-value">Confidential</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 1 — PROJECT OVERVIEW                                      -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-eyebrow">Section 01</div>
+  <div class="section-title">Project Overview</div>
+  <div class="section-desc">
+    FG Inventory is a production-grade, web-based ERP system built for a food &amp; grains wholesale business.
+    It replaces manual stock registers with a real-time intelligence platform — barcode-driven flows, FIFO expiry tracking,
+    AI-generated operational insights, and an EPR compliance module.
+  </div>
+  <div class="section-rule"></div>
+
+  <!-- Tech Stack -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:12px;">Technology Stack</div>
+  <div class="arch-grid">
+    <div class="arch-box frontend">
+      <div class="arch-box-title">Frontend</div>
+      <span class="arch-tag">React 18</span>
+      <span class="arch-tag">Vite 5</span>
+      <span class="arch-tag">Recharts</span>
+      <span class="arch-tag">React Router v6</span>
+      <span class="arch-tag">Tailwind v4 (EPR)</span>
+    </div>
+    <div class="arch-box backend">
+      <div class="arch-box-title">Backend</div>
+      <span class="arch-tag">Node.js</span>
+      <span class="arch-tag">Express</span>
+      <span class="arch-tag">Knex.js</span>
+      <span class="arch-tag">JWT Auth</span>
+      <span class="arch-tag">SheetJS</span>
+      <span class="arch-tag">node-cron</span>
+    </div>
+    <div class="arch-box database">
+      <div class="arch-box-title">Database</div>
+      <span class="arch-tag">PostgreSQL</span>
+      <span class="arch-tag">Neon (Cloud)</span>
+      <span class="arch-tag">FIFO Locking</span>
+      <span class="arch-tag">Advisory Locks</span>
+    </div>
+    <div class="arch-box infra">
+      <div class="arch-box-title">Infra &amp; Auth</div>
+      <span class="arch-tag">JWT + RBAC</span>
+      <span class="arch-tag">5 Roles</span>
+      <span class="arch-tag">Axios Interceptors</span>
+      <span class="arch-tag">Rate Limiting</span>
+    </div>
+  </div>
+
+  <!-- User Roles -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:12px;">User Roles &amp; Access</div>
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Permissions</th><th>Key Pages</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Admin</strong></td><td>Full access + user management + all reports</td><td>All pages, Users, Audit Log, System Health, Normalize</td></tr>
+      <tr><td><strong>Purchase</strong></td><td>Inward entry, PO creation, vendor management</td><td>Purchase Orders, Inward, Vendors</td></tr>
+      <tr><td><strong>Warehouse</strong></td><td>Receive goods, barcode scan, stock view</td><td>Scan, Items, Batches, Stock Transfers</td></tr>
+      <tr><td><strong>Sales</strong></td><td>Outward dispatch, challan generation</td><td>Outward, Customers, Challan</td></tr>
+      <tr><td><strong>View-only</strong></td><td>Read-only access to reports</td><td>Dashboard, Reports, MIS, Expiry Alerts</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Business Modules -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:12px;">Core Business Modules</div>
+  <div class="card-grid-3">
+    <div class="card accent-amber">
+      <div class="card-icon">📦</div>
+      <div class="card-title">Inventory Engine</div>
+      <div class="card-body">FIFO batch tracking · Expiry management · Dynamic reorder points · Live stock valuation</div>
+    </div>
+    <div class="card accent-green">
+      <div class="card-icon">↙↗</div>
+      <div class="card-title">Transaction Flows</div>
+      <div class="card-body">PO → Inward → Confirm → Lock · Dispatch → FIFO pick → Challan → Lock</div>
+    </div>
+    <div class="card accent-blue">
+      <div class="card-icon">🤖</div>
+      <div class="card-title">AI Intelligence</div>
+      <div class="card-body">Velocity scoring · Demand trends · Stockout risk · Auto-generated operational insights</div>
+    </div>
+    <div class="card accent-purple">
+      <div class="card-icon">♻️</div>
+      <div class="card-title">EPR Compliance</div>
+      <div class="card-body">PWM Rules 2022 · 8 material classes · Liability computation · Recyclability matrix</div>
+    </div>
+    <div class="card accent-red">
+      <div class="card-icon">⚠️</div>
+      <div class="card-title">Alerts &amp; Risk</div>
+      <div class="card-body">Low-stock alerts · Expiry risk badges · Nightly batch risk scoring (0–100)</div>
+    </div>
+    <div class="card accent-cyan">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Analytics &amp; MIS</div>
+      <div class="card-body">Margin tracker · Shrinkage cost · Dead stock detection · Monthly MIS dashboard</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left"><span class="footer-logo">FG</span> Inventory Management System</div>
+    <div class="footer-right">Confidential · Internal Use Only · Page 1</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 2 — BEFORE BUILD                                          -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-eyebrow">Section 02</div>
+  <div class="section-title">Before the Build</div>
+  <div class="section-desc">
+    The state of inventory management before FG Inventory was implemented — manual processes, fragmented records,
+    zero visibility into stock health or compliance obligations.
+  </div>
+  <div class="section-rule"></div>
+
+  <div class="card-grid-2" style="margin-bottom:28px;">
+    <div class="card accent-red">
+      <div class="card-title">Stock Management</div>
+      <div class="card-body" style="margin-top:8px;">
+        Manual register entries · No batch tracking · FIFO not enforced · Stock counts done weekly by hand ·
+        Expiry dates tracked on paper · No reorder triggers
+      </div>
+    </div>
+    <div class="card accent-red">
+      <div class="card-title">Inward / Outward</div>
+      <div class="card-body" style="margin-top:8px;">
+        Excel sheets per vendor · No PO linkage · Manual challan writing · No confirmation or lock process ·
+        Corrections by erasing entries · Zero audit trail
+      </div>
+    </div>
+    <div class="card accent-red">
+      <div class="card-title">Reporting &amp; Visibility</div>
+      <div class="card-body" style="margin-top:8px;">
+        No real-time dashboard · Month-end reconciliation only · Margin calculated manually in Excel ·
+        No dead stock identification · No vendor performance data
+      </div>
+    </div>
+    <div class="card accent-red">
+      <div class="card-title">Compliance &amp; Access</div>
+      <div class="card-body" style="margin-top:8px;">
+        No user roles or access control · Anyone could edit any record · EPR obligations unknown ·
+        No audit log · No barcode scanning — all entry manual
+      </div>
+    </div>
+  </div>
+
+  <!-- Pain Points Table -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:12px;">Key Pain Points vs. Impact</div>
+  <table>
+    <thead>
+      <tr><th>Pain Point</th><th>Root Cause</th><th>Business Impact</th><th>Severity</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Stock spoilage</strong></td>
+        <td>No FIFO enforcement, expiry not tracked per batch</td>
+        <td>Direct write-off loss on expired goods</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+      </tr>
+      <tr>
+        <td><strong>Stockouts</strong></td>
+        <td>No reorder triggers; stock counted weekly</td>
+        <td>Lost sales, emergency purchases at high cost</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+      </tr>
+      <tr>
+        <td><strong>Reconciliation errors</strong></td>
+        <td>Manual challan ↔ invoice ↔ register mismatch</td>
+        <td>Revenue leakage, vendor disputes</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+      </tr>
+      <tr>
+        <td><strong>No audit trail</strong></td>
+        <td>Single Excel file, anyone edits</td>
+        <td>Fraud risk, no accountability</td>
+        <td><span class="badge badge-critical">Critical</span></td>
+      </tr>
+      <tr>
+        <td><strong>EPR non-compliance</strong></td>
+        <td>PWM Rules 2022 obligations unknown</td>
+        <td>Regulatory penalty risk</td>
+        <td><span class="badge badge-active">High</span></td>
+      </tr>
+      <tr>
+        <td><strong>No margin visibility</strong></td>
+        <td>Dispatch rate vs purchase rate never compared</td>
+        <td>Pricing decisions made blind</td>
+        <td><span class="badge badge-active">High</span></td>
+      </tr>
+      <tr>
+        <td><strong>No barcode scanning</strong></td>
+        <td>All entry manual, high error rate</td>
+        <td>Slow operations, data inaccuracy</td>
+        <td><span class="badge badge-active">High</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div class="footer-left"><span class="footer-logo">FG</span> Inventory Management System</div>
+    <div class="footer-right">Confidential · Internal Use Only · Page 2</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 3 — AFTER BUILD / CURRENT STATUS                         -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-eyebrow">Section 03</div>
+  <div class="section-title">After Build — Current Status</div>
+  <div class="section-desc">
+    What has been delivered, what is live, and what remains. Phase 3 of 4 — entering UAT preparation.
+  </div>
+  <div class="section-rule"></div>
+
+  <!-- Phase Progress -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:14px;">Phase Progress</div>
+  <div class="progress-row">
+    <div class="progress-header"><span class="progress-label">Phase 1 — Item Master, Auth, Barcode</span><span class="progress-pct">100%</span></div>
+    <div class="progress-track"><div class="progress-fill green" style="width:100%"></div></div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-header"><span class="progress-label">Phase 2 — Inward / Outward Flows, FIFO, Challan</span><span class="progress-pct">100%</span></div>
+    <div class="progress-track"><div class="progress-fill green" style="width:100%"></div></div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-header"><span class="progress-label">Phase 3 — Reports, MIS, Intelligence Layer, EPR, AI Dashboard</span><span class="progress-pct">85%</span></div>
+    <div class="progress-track"><div class="progress-fill" style="width:85%"></div></div>
+  </div>
+  <div class="progress-row">
+    <div class="progress-header"><span class="progress-label">Phase 4 — UAT, Training, Production Deploy</span><span class="progress-pct">0%</span></div>
+    <div class="progress-track"><div class="progress-fill purple" style="width:0%"></div></div>
+  </div>
+
+  <div style="height:20px;"></div>
+
+  <!-- Before vs After -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:12px;">Before vs. After Comparison</div>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th class="before">❌ Before</th>
+        <th class="feature">Feature Area</th>
+        <th class="after">✅ After (Live)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="before">Paper register, no batch IDs</td>
+        <td class="feature">Stock Tracking</td>
+        <td class="after">Live batch ledger, FIFO enforced, qty_remaining per batch in real-time</td>
+      </tr>
+      <tr>
+        <td class="before">Manual challan writing</td>
+        <td class="feature">Outward Dispatch</td>
+        <td class="after">FIFO auto-pick → Challan auto-generated → Lock with audit trail</td>
+      </tr>
+      <tr>
+        <td class="before">Excel sheets, no PO workflow</td>
+        <td class="feature">Inward / Purchasing</td>
+        <td class="after">PO → Inward → Confirm → Lock → Batch created automatically</td>
+      </tr>
+      <tr>
+        <td class="before">Weekly manual count</td>
+        <td class="feature">Stock Alerts</td>
+        <td class="after">Dynamic ROP — alerts fire when live stock ≤ reorder point (nightly recalc)</td>
+      </tr>
+      <tr>
+        <td class="before">No expiry awareness</td>
+        <td class="feature">Expiry Management</td>
+        <td class="after">Per-batch expiry · Risk score 0–100 · Expired qty auto-zeroed nightly</td>
+      </tr>
+      <tr>
+        <td class="before">No barcode system</td>
+        <td class="feature">Barcode Scanning</td>
+        <td class="after">EAN-13 auto-generated · HID scanner input · Scan → item lookup in &lt;1s</td>
+      </tr>
+      <tr>
+        <td class="before">No visibility, month-end only</td>
+        <td class="feature">Dashboard &amp; Reporting</td>
+        <td class="after">AI Command Center — velocity leaders, demand trends, insights, live activity</td>
+      </tr>
+      <tr>
+        <td class="before">EPR obligations unknown</td>
+        <td class="feature">EPR Compliance</td>
+        <td class="after">Full EPR dashboard — 8 material classes, liability calc, recyclability matrix</td>
+      </tr>
+      <tr>
+        <td class="before">No access control</td>
+        <td class="feature">Security &amp; Roles</td>
+        <td class="after">JWT + 5 RBAC roles · Rate-limited login · Audit log for every write action</td>
+      </tr>
+      <tr>
+        <td class="before">No margin data</td>
+        <td class="feature">Margin &amp; MIS</td>
+        <td class="after">Per-item margin %, shrinkage cost, dead stock detection, Margin Report page</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div class="footer-left"><span class="footer-logo">FG</span> Inventory Management System</div>
+    <div class="footer-right">Confidential · Internal Use Only · Page 3</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 4 — FEATURE DELIVERY LOG                                  -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-eyebrow">Section 04</div>
+  <div class="section-title">Feature Delivery Log</div>
+  <div class="section-desc">
+    Full timeline of what was built, what's in active development, and what's queued next.
+  </div>
+  <div class="section-rule"></div>
+
+  <div class="timeline">
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 1 — Foundation <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">Item Master CRUD · Auto item_code (FG-0001) · EAN-13 barcode generation · Category + Sub-category structure · User auth (JWT) · 5-role RBAC middleware · Login page · Barcode scanner input · Label print</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 2 — Transaction Flows <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">Purchase Orders · Inward (PO→Receive→Scan→Confirm→Lock) · Outward (Dispatch→FIFO pick→Challan→Lock) · Batch creation on inward confirm · FIFO with row-level locking (.forUpdate()) · Challan auto-number with advisory lock · Immutable locked records · Reversal entry pattern</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 3A — Intelligence &amp; Analytics <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">Nightly cron: risk scoring (0–100) · Dynamic ROP recalc · Expired batch auto-zero · Dead stock detection query · Margin &amp; shrinkage per item · MIS Dashboard API · Vendor history · Excel export (SheetJS) · Expiry Alerts page · Margin Report page · Batch Viewer</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 3B — AI Command Center <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">New /api/intelligence/command-center endpoint · Velocity scoring (kg/day 30-day rolling) · Demand trend (last 7d vs prior 7d) · Stockout risk levels (critical/high/medium/low) · Auto-generated AI insights (no external API) · Dashboard rebuilt — dark hero header, 7 KPI strip, velocity leaders table, Recharts category chart, live activity feed, insights panel</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 3C — EPR Compliance Dashboard <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">EPR module (India PWM Rules 2022) · 8 material classes (HDPE, LDPE, MLP, PET-01, ALU-CAN, Liquid Carton, Paperboard) · Liability computation engine · Recyclability color matrix (🟢🟡🔴) · DonutChart (pure SVG) · 5 retail categories × 24 sub-categories · Full PostgreSQL schema + seed data</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 3D — Security Hardening <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">FIFO race condition fixed (forUpdate row lock) · Challan sequence serialised (pg_advisory_xact_lock) · 401 redirect loop eliminated (_redirecting flag) · Login brute-force protection (5 attempts / 15 min per IP) · Direct fetch() calls replaced with axios client · Bulk PATCH wrapped in transaction · Query injection guards on filter params</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-done">✓</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 3E — Food Photography System <span class="badge badge-done">Complete</span></div>
+        <div class="timeline-sub">Wikipedia REST API thumbnail pipeline (no API key, CORS-enabled) · 35+ food categories mapped to correct Wikipedia articles · Async load with emoji placeholder → real photo crossfade · Session-level cache + concurrent fetch deduplication · prewarmImages() fires on Items page load · Custom item_image_url always takes priority</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-active">⟳</div>
+      <div class="timeline-content">
+        <div class="timeline-label">In Progress <span class="badge badge-active">Active</span></div>
+        <div class="timeline-sub">Items page grid/list view toggle · Thumbnail-first InventoryGridCard component · Velocity badges on Items page (🔥 Fast / ⚡ Active / 💤 Slow) · Stock health indicator bars</div>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot dot-pending">○</div>
+      <div class="timeline-content">
+        <div class="timeline-label">Phase 4 — UAT &amp; Production <span class="badge badge-pending">Queued</span></div>
+        <div class="timeline-sub">User acceptance testing with Prachi · Staff training sessions · Production deployment · Mobile sidebar collapse · Push notifications for low stock · Pet Pooja API integration (optional)</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <div class="footer-left"><span class="footer-logo">FG</span> Inventory Management System</div>
+    <div class="footer-right">Confidential · Internal Use Only · Page 4</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!-- PAGE 5 — SKILLS MATRIX                                         -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="section-eyebrow">Section 05</div>
+  <div class="section-title">Developer Skills Matrix</div>
+  <div class="section-desc">
+    Required technical competencies to continue building and maintaining FG Inventory through Phase 4.
+  </div>
+  <div class="section-rule"></div>
+
+  <table>
+    <thead>
+      <tr><th>Skill</th><th>Level</th><th>How It Applies to This Project</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>React 18 + Hooks</strong></td>
+        <td><span class="skill-expert">Expert</span></td>
+        <td>Component architecture, async state, FoodPhoto crossfade, velocity leaders table, AI insight cards</td>
+      </tr>
+      <tr>
+        <td><strong>Node.js + Express</strong></td>
+        <td><span class="skill-expert">Expert</span></td>
+        <td>25+ REST routes, middleware chains, role guards, error handling, streaming blob downloads</td>
+      </tr>
+      <tr>
+        <td><strong>PostgreSQL + Knex.js</strong></td>
+        <td><span class="skill-expert">Expert</span></td>
+        <td>FIFO batch queries, window functions, .forUpdate() row locks, pg_advisory_xact_lock, CTE velocity SQL</td>
+      </tr>
+      <tr>
+        <td><strong>Business Logic Design</strong></td>
+        <td><span class="skill-expert">Expert</span></td>
+        <td>FIFO dispatch, ROP formula, risk scoring (0–100), margin/shrinkage model, EPR liability calc</td>
+      </tr>
+      <tr>
+        <td><strong>JWT + RBAC Security</strong></td>
+        <td><span class="skill-advanced">Advanced</span></td>
+        <td>5-role system, route + UI gating, brute-force rate limiter, 401 redirect de-duplication</td>
+      </tr>
+      <tr>
+        <td><strong>Data Visualisation</strong></td>
+        <td><span class="skill-advanced">Advanced</span></td>
+        <td>Recharts BarChart / ResponsiveContainer, pure SVG DonutChart (EPR), stock health progress bars</td>
+      </tr>
+      <tr>
+        <td><strong>Async / Performance Patterns</strong></td>
+        <td><span class="skill-advanced">Advanced</span></td>
+        <td>Promise.allSettled for parallel API calls, Wikipedia fetch deduplication, session-level image cache, prewarm</td>
+      </tr>
+      <tr>
+        <td><strong>CSS / Design Systems</strong></td>
+        <td><span class="skill-advanced">Advanced</span></td>
+        <td>All UI via JS style objects + CSS custom properties (no className) · Dark hero headers · Glassmorphism patterns</td>
+      </tr>
+      <tr>
+        <td><strong>Excel / SheetJS</strong></td>
+        <td><span class="skill-inter">Intermediate</span></td>
+        <td>Inward template download, import row validation, export endpoints for all report types</td>
+      </tr>
+      <tr>
+        <td><strong>Barcode Systems</strong></td>
+        <td><span class="skill-inter">Intermediate</span></td>
+        <td>EAN-13 generation, HID scanner keyboard emulation, focused input capture, scan-to-lookup flow</td>
+      </tr>
+      <tr>
+        <td><strong>Cron / Scheduled Jobs</strong></td>
+        <td><span class="skill-inter">Intermediate</span></td>
+        <td>Nightly 2am job: risk scoring, ROP recalc, batch expiry zeroing, cron_log table</td>
+      </tr>
+      <tr>
+        <td><strong>Tailwind CSS v4</strong></td>
+        <td><span class="skill-inter">Intermediate</span></td>
+        <td>EPR dashboard only — PostCSS plugin setup, utility-only import avoiding preflight conflict with existing app</td>
+      </tr>
+      <tr>
+        <td><strong>Regulatory / Compliance</strong></td>
+        <td><span class="skill-inter">Intermediate</span></td>
+        <td>India EPR PWM Rules 2022 — material class rates, recyclability grading, waste log schema</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Summary KPIs -->
+  <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#64748b;margin-bottom:12px;">Project by the Numbers</div>
+  <div class="card-grid-3">
+    <div class="card accent-amber" style="text-align:center;">
+      <div class="card-value">25+</div>
+      <div class="card-title" style="margin-top:4px;">API Routes</div>
+    </div>
+    <div class="card accent-green" style="text-align:center;">
+      <div class="card-value">30+</div>
+      <div class="card-title" style="margin-top:4px;">React Pages / Components</div>
+    </div>
+    <div class="card accent-blue" style="text-align:center;">
+      <div class="card-value">15</div>
+      <div class="card-title" style="margin-top:4px;">DB Tables</div>
+    </div>
+    <div class="card accent-purple" style="text-align:center;">
+      <div class="card-value">5</div>
+      <div class="card-title" style="margin-top:4px;">User Roles</div>
+    </div>
+    <div class="card accent-red" style="text-align:center;">
+      <div class="card-value">35+</div>
+      <div class="card-title" style="margin-top:4px;">Food Categories Mapped</div>
+    </div>
+    <div class="card accent-cyan" style="text-align:center;">
+      <div class="card-value">Phase 3</div>
+      <div class="card-title" style="margin-top:4px;">of 4 Phases</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-left"><span class="footer-logo">FG</span> Inventory Management System · Coordinator: Prachi</div>
+    <div class="footer-right">Confidential · Internal Use Only · 25 May 2026 · Page 5</div>
+  </div>
+</div>
+
+</body>
+</html>

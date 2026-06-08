@@ -1,0 +1,374 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  empId      String   @unique
+  name       String
+  department String
+  floor      String   @default("")
+  role       String   @default("employee") // admin | employee
+  password   String   // hashed in production; plaintext for demo
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  requests     Request[]
+  transactions Transaction[]
+  notifications Notification[]
+  checkouts    ItemCheckout[]
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info") // info | success | warning | error
+  read      Boolean  @default(false)
+  link      String?  // Optional link to view details
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, read, createdAt])
+}
+
+model Item {
+  id           String    @id @default(cuid())
+  name         String
+  category     String
+  unit         String    @default("pcs")
+  stock        Int       @default(0)
+  minStock     Int       @default(10)
+  reservedQty  Int       @default(0)
+  version      Int       @default(1)
+  deletedAt    DateTime?
+  price        Float     @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  requests      Request[]
+  transactions  Transaction[]
+  poItems       POItem[]
+  variants      ItemVariant[]
+  transferItems StockTransferItem[]
+  tags          ItemTag[]
+  checkouts     ItemCheckout[]
+  pickListItems PickListItem[]
+  maintenanceSchedules MaintenanceSchedule[]
+  photoUrl      String?
+  folder        String?
+  customFields  Json?
+
+  // Note: SQLite treats NULLs as distinct in unique constraints, so
+  // @@unique([name, category, deletedAt]) won't prevent duplicates where deletedAt IS NULL.
+  // The API layer handles uniqueness checks for non-deleted items manually.
+  // This index helps with lookups by name+category among active items.
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  email     String?
+  category  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pos       PurchaseOrder[]
+}
+
+model PurchaseOrder {
+  id          String   @id @default(cuid())
+  poNumber    String   @unique
+  supplierId  String
+  status      String   @default("DRAFT") // DRAFT | SENT | RECEIVED | CANCELLED
+  totalAmount Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  items       POItem[]
+  invoices    PurchaseInvoice[]
+  challans    DeliveryChallan[]
+
+  @@index([status, createdAt])
+}
+
+model POItem {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  itemId          String
+  qty             Int
+  unitPrice       Float    @default(0)
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  item            Item          @relation(fields: [itemId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([itemId])
+}
+
+model Request {
+  id         String   @id @default(cuid())
+  userId     String
+  employee   String
+  department String
+  itemId     String
+  itemName   String
+  qty        Int
+  note       String?  // Optional description from the requester
+  status     String   @default("Pending") // Pending | Approved | Issued | Rejected | Cancelled
+  issuedAt   DateTime?
+  issuedBy   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id])
+  item       Item     @relation(fields: [itemId], references: [id])
+  gatePasses GatePass[]
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([itemId])
+}
+
+model Transaction {
+  id        String   @id @default(cuid())
+  type      String   // IN | OUT
+  itemId    String
+  itemName  String
+  qty       Int
+  reference String   @default("")
+  userId    String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  item      Item     @relation(fields: [itemId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([itemId, date])
+  @@index([userId, date])
+  @@index([type, date])
+}
+
+model FeatureFlag {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Boolean @default(true)
+}
+
+model SeedFlag {
+  id     String @id @default(cuid())
+  seeded Boolean @default(false)
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String   // LOGIN | CREATE_ITEM | UPDATE_ITEM | DELETE_ITEM | APPROVE_REQUEST | REJECT_REQUEST | ISSUE_REQUEST
+  userId     String?
+  userName   String?
+  targetId   String?
+  targetName String?
+  metadata   String?  // JSON string
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([action])
+}
+
+model PurchaseInvoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  purchaseOrderId String
+  amount          Float
+  date            DateTime @default(now())
+  status          String   @default("UNPAID") // UNPAID | PAID | CANCELLED
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([status])
+}
+
+model DeliveryChallan {
+  id              String   @id @default(cuid())
+  challanNumber   String   @unique
+  purchaseOrderId String
+  receivedBy      String
+  date            DateTime @default(now())
+  status          String   @default("PENDING") // PENDING | CONFIRMED
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([purchaseOrderId])
+}
+
+model GatePass {
+  id            String   @id @default(cuid())
+  passNumber    String   @unique
+  type          String   @default("OUT") // IN | OUT
+  requestId     String?
+  receiverName  String
+  vehicleNumber String?
+  purpose       String?
+  status        String   @default("DRAFT") // DRAFT | ISSUED | COMPLETED | CANCELLED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  request       Request? @relation(fields: [requestId], references: [id])
+
+  @@index([requestId])
+  @@index([status])
+}
+
+model ItemVariant {
+  id        String   @id @default(cuid())
+  itemId    String
+  name      String
+  packSize  String   @default("")
+  packQty   Int      @default(1)
+  unit      String   @default("pcs")
+  barcode   String?
+  stock     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item          Item                @relation(fields: [itemId], references: [id])
+  transferItems StockTransferItem[]
+
+  @@index([itemId])
+}
+
+model StockTransfer {
+  id            String   @id @default(cuid())
+  memoNumber    String   @unique
+  fromLocation  String
+  toLocation    String
+  status        String   @default("DRAFT") // DRAFT | CONFIRMED | RECONCILED
+  ppPoReference String?
+  ppReconciled  Boolean  @default(false)
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items         StockTransferItem[]
+
+  @@index([status, createdAt])
+}
+
+model StockTransferItem {
+  id          String   @id @default(cuid())
+  transferId  String
+  itemId      String
+  itemName    String
+  variantId   String?
+  variantName String?
+  qty         Float    @default(0)
+  unit        String   @default("pcs")
+
+  transfer    StockTransfer  @relation(fields: [transferId], references: [id])
+  item        Item           @relation(fields: [itemId], references: [id])
+  variant     ItemVariant?   @relation(fields: [variantId], references: [id])
+
+  @@index([transferId])
+  @@index([itemId])
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String    @default("#6366f1")
+  createdAt DateTime  @default(now())
+  items     ItemTag[]
+}
+
+model ItemTag {
+  itemId String
+  tagId  String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([itemId, tagId])
+}
+
+model ItemCheckout {
+  id               String    @id @default(cuid())
+  itemId           String
+  userId           String
+  qty              Float
+  purpose          String?
+  checkedOutAt     DateTime  @default(now())
+  expectedReturnAt DateTime?
+  returnedAt       DateTime?
+  status           String    @default("ACTIVE")
+  notes            String?
+  item             Item      @relation(fields: [itemId], references: [id])
+  user             User      @relation(fields: [userId], references: [id])
+}
+
+model PickList {
+  id        String         @id @default(cuid())
+  name      String
+  status    String         @default("DRAFT")
+  notes     String?
+  createdBy String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  items     PickListItem[]
+}
+
+model PickListItem {
+  id         String   @id @default(cuid())
+  pickListId String
+  itemId     String
+  itemName   String
+  qty        Float
+  pickedQty  Float    @default(0)
+  unit       String   @default("pcs")
+  status     String   @default("PENDING")
+  pickList   PickList @relation(fields: [pickListId], references: [id], onDelete: Cascade)
+  item       Item     @relation(fields: [itemId], references: [id])
+}
+
+model MaintenanceSchedule {
+  id            String    @id @default(cuid())
+  itemId        String
+  title         String
+  dueDate       DateTime
+  recurringDays Int?
+  lastCompleted DateTime?
+  status        String    @default("PENDING")
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  item          Item      @relation(fields: [itemId], references: [id])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  name      String
+  url       String
+  events    String
+  active    Boolean  @default(true)
+  secret    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

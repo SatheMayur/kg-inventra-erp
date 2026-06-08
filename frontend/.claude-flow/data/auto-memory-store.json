@@ -1,0 +1,14 @@
+[
+  {
+    "id": "task-mdm-enhancement",
+    "key": "mdm-enhancement",
+    "content": "Task completed: mdm-enhancement",
+    "namespace": "tasks",
+    "type": "task-outcome",
+    "metadata": {
+      "success": true,
+      "quality": 0.85
+    },
+    "createdAt": 1779367355138
+  }
+]

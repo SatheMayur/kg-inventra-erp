@@ -1,0 +1,14 @@
+[
+  {
+    "id": "task-demo-and-tour",
+    "key": "demo-and-tour",
+    "content": "Task completed: demo-and-tour",
+    "namespace": "tasks",
+    "type": "task-outcome",
+    "metadata": {
+      "success": true,
+      "quality": 0.85
+    },
+    "createdAt": 1779360480709
+  }
+]
