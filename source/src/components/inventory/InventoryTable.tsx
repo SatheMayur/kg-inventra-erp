@@ -151,13 +151,18 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
 
   async function handleEdit() {
     if (!editItem) return
+    const minStockN = parseInt(editMinStock, 10)
+    if (!Number.isFinite(minStockN) || minStockN < 0) {
+      toast.error('Min stock must be a non-negative number')
+      return
+    }
     setEditLoading(true)
     try {
       await api.items.update(editItem.id, {
         name: editName.trim(),
         category: editCategory.trim(),
         unit: editUnit.trim(),
-        minStock: parseInt(editMinStock, 10),
+        minStock: minStockN,
       })
       toast.success('Item updated')
       setEditItem(null)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
+import { releaseReservation } from '@/lib/stock';
 
 export async function PATCH(
   request: NextRequest,
@@ -36,17 +37,8 @@ export async function PATCH(
         throw new ApiError(400, 'Only pending requests can be cancelled', 'BAD_REQUEST');
       }
 
-      // Release the stock reservation
-      const item = await tx.item.findUnique({ where: { id: req.itemId } });
-      if (item) {
-        await tx.item.update({
-          where: { id: req.itemId },
-          data: {
-            reservedQty: Math.max(0, item.reservedQty - req.qty),
-            version: item.version + 1,
-          },
-        });
-      }
+      // Release the stock reservation (atomic decrement — no lost update)
+      await releaseReservation(tx, req.itemId, req.qty);
 
       return tx.request.update({ where: { id }, data: { status: 'Cancelled' } });
     });

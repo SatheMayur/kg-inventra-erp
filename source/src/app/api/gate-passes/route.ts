@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
-import { handleApiError } from '@/lib/api-utils';
+import { handleApiError, ApiError } from '@/lib/api-utils';
+import { z } from 'zod';
+
+const gatePassCreateSchema = z.object({
+  type: z.enum(['IN', 'OUT']),
+  requestId: z.string().min(1).nullable().optional(),
+  receiverName: z.string().min(1).max(200),
+  vehicleNumber: z.string().max(50).nullable().optional(),
+  purpose: z.string().min(1).max(300),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,11 +35,11 @@ export async function POST(request: NextRequest) {
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
     if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const body = await request.json();
-    const { type, requestId, receiverName, vehicleNumber, purpose } = body;
+    const data = gatePassCreateSchema.parse(await request.json());
 
-    if (!type || !receiverName || !purpose) {
-      return NextResponse.json({ error: 'type, receiverName, and purpose are required' }, { status: 400 });
+    if (data.requestId) {
+      const linkedRequest = await db.request.findUnique({ where: { id: data.requestId } });
+      if (!linkedRequest) throw new ApiError(404, 'Linked request not found', 'NOT_FOUND');
     }
 
     // Generate sequential pass number GP-YYYYMMDD-NNN
@@ -41,7 +50,15 @@ export async function POST(request: NextRequest) {
     const passNumber = `GP-${date}-${(count + 1).toString().padStart(3, '0')}`;
 
     const pass = await db.gatePass.create({
-      data: { passNumber, type, requestId, receiverName, vehicleNumber, purpose, status: 'ISSUED' },
+      data: {
+        passNumber,
+        type: data.type,
+        requestId: data.requestId ?? null,
+        receiverName: data.receiverName,
+        vehicleNumber: data.vehicleNumber ?? null,
+        purpose: data.purpose,
+        status: 'ISSUED',
+      },
     });
 
     return NextResponse.json(pass, { status: 201 });
@@ -67,6 +84,9 @@ export async function PATCH(request: NextRequest) {
     if (!VALID_STATUSES.includes(status)) {
       return NextResponse.json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` }, { status: 400 });
     }
+
+    const existing = await db.gatePass.findUnique({ where: { id } });
+    if (!existing) throw new ApiError(404, 'Gate pass not found', 'NOT_FOUND');
 
     const pass = await db.gatePass.update({
       where: { id },

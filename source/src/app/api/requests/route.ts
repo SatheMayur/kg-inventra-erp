@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
+import { requestCreateSchema } from '@/lib/validation';
 
 const ALLOWED_SORT_FIELDS = ['createdAt', 'updatedAt', 'qty', 'status'] as const;
 
@@ -52,15 +53,9 @@ export async function POST(request: NextRequest) {
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
-    const { userId, itemId, qty, note } = body;
-
-    if (!userId || !itemId || !qty) {
-      throw new ApiError(400, 'userId, itemId, and qty are required', 'BAD_REQUEST');
-    }
-
-    if (typeof qty !== 'number' || qty <= 0) {
-      throw new ApiError(400, 'Quantity must be a positive number', 'BAD_REQUEST');
-    }
+    // Schema enforces integer qty >= 1 (prevents fractional reservations on Int stock)
+    const { userId, itemId, qty } = requestCreateSchema.parse(body);
+    const note: string | undefined = typeof body.note === 'string' ? body.note : undefined;
 
     // Employees can only create requests for themselves
     if (auth.user?.role === 'employee' && userId !== auth.user.id) {

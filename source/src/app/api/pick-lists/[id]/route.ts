@@ -72,8 +72,11 @@ export async function PATCH(
           if (itemUpdate.pickedQty !== undefined) itemPatch.pickedQty = itemUpdate.pickedQty;
           if (itemUpdate.status !== undefined) itemPatch.status = itemUpdate.status;
           if (Object.keys(itemPatch).length > 0) {
-            await trx.pickListItem.update({
-              where: { id: itemUpdate.id },
+            // Scope to this pick list so a caller can't mutate another list's
+            // line by passing a foreign pickListItem id. updateMany ignores
+            // rows that don't belong to {id}.
+            await trx.pickListItem.updateMany({
+              where: { id: itemUpdate.id, pickListId: id },
               data: itemPatch,
             });
           }

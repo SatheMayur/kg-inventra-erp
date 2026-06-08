@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
-import { handleApiError, ApiError } from '@/lib/api-utils';
+import { handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
 import { createAuditLog, AuditAction } from '@/lib/audit';
+import { mutateStock } from '@/lib/stock';
 
 const createCheckoutSchema = z.object({
   itemId: z.string().min(1, 'Item is required'),
-  qty: z.number().positive('Qty must be positive'),
+  qty: z.number().int('Qty must be a whole number').positive('Qty must be positive'),
   purpose: z.string().max(300).optional(),
   expectedReturnAt: z.string().datetime().optional(),
   notes: z.string().max(500).optional(),
@@ -69,30 +70,40 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validated = createCheckoutSchema.parse(body);
 
-    const item = await db.item.findUnique({ where: { id: validated.itemId, deletedAt: null } });
-    if (!item) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
+    const checkout = await db.$transaction(async (tx) => {
+      const created = await tx.itemCheckout.create({
+        data: {
+          itemId: validated.itemId,
+          userId: auth.user!.id,
+          qty: validated.qty,
+          purpose: validated.purpose,
+          expectedReturnAt: validated.expectedReturnAt ? new Date(validated.expectedReturnAt) : null,
+          notes: validated.notes,
+        },
+        include: {
+          item: { select: { name: true, unit: true } },
+          user: { select: { name: true, empId: true } },
+        },
+      });
 
-    const checkout = await db.itemCheckout.create({
-      data: {
+      // Physically remove the units from on-hand stock. mutateStock validates the
+      // item exists/active and that enough stock is available (throws 409 otherwise).
+      await mutateStock(tx, {
         itemId: validated.itemId,
+        delta: -validated.qty,
+        reference: `Checkout ${created.id}`,
         userId: auth.user!.id,
-        qty: validated.qty,
-        purpose: validated.purpose,
-        expectedReturnAt: validated.expectedReturnAt ? new Date(validated.expectedReturnAt) : null,
-        notes: validated.notes,
-      },
-      include: {
-        item: { select: { name: true, unit: true } },
-        user: { select: { name: true, empId: true } },
-      },
+      });
+
+      return created;
     });
 
     await createAuditLog({
       action: 'CHECKOUT_ITEM' as AuditAction,
       user: auth.user,
       targetId: checkout.id,
-      targetName: item.name,
-      metadata: { itemId: item.id, qty: validated.qty, purpose: validated.purpose ?? null },
+      targetName: checkout.item.name,
+      metadata: { itemId: validated.itemId, qty: validated.qty, purpose: validated.purpose ?? null },
     });
 
     return NextResponse.json({ checkout }, { status: 201 });

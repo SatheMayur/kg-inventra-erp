@@ -13,7 +13,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authorize(request);
+    const auth = await authorize(request, ['admin']);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { id } = await params;
@@ -52,7 +52,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authorize(request);
+    const auth = await authorize(request, ['admin']);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { id } = await params;

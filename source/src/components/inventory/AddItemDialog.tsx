@@ -36,14 +36,21 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
       return
     }
 
+    const stockN = parseInt(stock, 10)
+    const minStockN = parseInt(minStock, 10)
+    if (!Number.isFinite(stockN) || stockN < 0 || !Number.isFinite(minStockN) || minStockN < 0) {
+      toast.error('Stock and min level must be non-negative numbers')
+      return
+    }
+
     try {
       setIsSubmitting(true)
       await api.items.create({
         name,
         category,
         unit,
-        stock: parseInt(stock, 10),
-        minStock: parseInt(minStock, 10),
+        stock: stockN,
+        minStock: minStockN,
       })
       toast.success('Item added successfully')
       onOpenChange(false)

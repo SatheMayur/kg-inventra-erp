@@ -14,7 +14,7 @@ export async function GET(
 
     const { id } = await params;
 
-    const item = await db.item.findUnique({ where: { id }, select: { customFields: true } });
+    const item = await db.item.findUnique({ where: { id, deletedAt: null }, select: { customFields: true } });
     if (!item) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
 
     return NextResponse.json({ values: (item.customFields as Record<string, unknown>) ?? {} });
@@ -33,6 +33,10 @@ export async function PATCH(
 
     const { id } = await params;
 
+    if (auth.user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { values } = body as { values?: Record<string, unknown> };
 
@@ -40,7 +44,7 @@ export async function PATCH(
       throw new ApiError(400, 'values must be an object', 'BAD_REQUEST');
     }
 
-    const item = await db.item.findUnique({ where: { id }, select: { customFields: true } });
+    const item = await db.item.findUnique({ where: { id, deletedAt: null }, select: { customFields: true } });
     if (!item) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
 
     const existing = (item.customFields as Record<string, unknown>) ?? {};

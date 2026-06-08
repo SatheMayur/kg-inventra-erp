@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { authorize } from '@/lib/auth'
 import { handleApiError, ApiError } from '@/lib/api-utils'
+import { assertSafeUrl } from '@/lib/safe-url'
 import { z } from 'zod'
 
 const createWebhookSchema = z.object({
@@ -32,6 +33,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const validated = createWebhookSchema.parse(body)
+
+    // SSRF guard: reject URLs that resolve to private/internal/metadata addresses
+    await assertSafeUrl(validated.url)
 
     const existing = await db.webhook.findFirst({ where: { url: validated.url } })
     if (existing) throw new ApiError(409, 'A webhook with this URL already exists', 'CONFLICT')

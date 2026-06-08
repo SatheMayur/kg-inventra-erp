@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError, ApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
+import { mutateStock } from '@/lib/stock';
 
 export async function PATCH(
   request: NextRequest,
@@ -31,36 +32,13 @@ export async function PATCH(
     // Commit transfer atomically — stock check inside tx to prevent TOCTOU
     const result = await db.$transaction(async (tx) => {
       for (const ti of transfer.items) {
-        const qty = Math.round(ti.qty);
-
-        const item = await tx.item.findUnique({ where: { id: ti.itemId } });
-        if (!item) throw new ApiError(404, `Item "${ti.itemName}" not found`, 'NOT_FOUND');
-        if (item.stock < qty) {
-          throw new ApiError(
-            400,
-            `Insufficient stock for "${ti.itemName}": have ${item.stock} ${item.unit}, need ${qty}`,
-            'INSUFFICIENT_STOCK'
-          );
-        }
-
-        await tx.item.update({
-          where: { id: ti.itemId },
-          data: {
-            stock: { decrement: qty },
-            version: { increment: 1 },
-          },
-        });
-
-        await tx.transaction.create({
-          data: {
-            type: 'OUT',
-            itemId: ti.itemId,
-            itemName: ti.itemName,
-            qty,
-            reference: `Transfer ${transfer.memoNumber} → ${transfer.toLocation}`,
-            userId: auth.user?.id,
-            date: new Date(),
-          },
+        // Shared helper: validates existence + sufficient stock, decrements,
+        // bumps version and writes the OUT ledger row (was duplicated inline).
+        await mutateStock(tx, {
+          itemId: ti.itemId,
+          delta: -Math.round(ti.qty),
+          reference: `Transfer ${transfer.memoNumber} → ${transfer.toLocation}`,
+          userId: auth.user?.id,
         });
       }
 

@@ -17,6 +17,10 @@ export async function PATCH(
     const body = await request.json();
     const { name, category, unit, minStock } = body;
 
+    if (minStock !== undefined && (!Number.isInteger(minStock) || minStock < 0)) {
+      throw new ApiError(400, 'minStock must be a non-negative integer', 'BAD_REQUEST');
+    }
+
     const result = await db.$transaction(async (tx) => {
       const item = await tx.item.findUnique({ where: { id } });
       if (!item || item.deletedAt) throw new ApiError(404, 'Item not found', 'NOT_FOUND');

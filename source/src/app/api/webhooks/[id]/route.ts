@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { authorize } from '@/lib/auth'
 import { handleApiError, ApiError } from '@/lib/api-utils'
+import { assertSafeUrl } from '@/lib/safe-url'
 import { z } from 'zod'
 
 const patchWebhookSchema = z.object({
@@ -24,6 +25,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const body = await request.json()
     const validated = patchWebhookSchema.parse(body)
+
+    if (validated.url !== undefined) await assertSafeUrl(validated.url)
 
     const webhook = await db.webhook.update({
       where: { id },
@@ -71,6 +74,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const hook = await db.webhook.findUnique({ where: { id } })
     if (!hook) throw new ApiError(404, 'Webhook not found', 'NOT_FOUND')
+
+    // SSRF guard before the server fetches the stored URL
+    await assertSafeUrl(hook.url)
 
     const testBody = JSON.stringify({
       event: 'TEST',

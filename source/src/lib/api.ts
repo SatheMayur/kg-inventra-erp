@@ -645,13 +645,13 @@ export const api = {
   itemTags: {
     list: (itemId: string) => GET<{ tags: Array<{ tag: { id: string; name: string; color: string } }> }>(`/api/items/${itemId}/tags`).then(r => r.tags),
     add: (itemId: string, tagId: string) => POST<{ itemTag: object }>(`/api/items/${itemId}/tags`, { tagId }),
-    remove: (itemId: string, tagId: string) => POST<{ success: boolean }>(`/api/items/${itemId}/tags`, { tagId, _method: 'DELETE' }),
+    remove: (itemId: string, tagId: string) => request<{ success: boolean }>('DELETE', `/api/items/${itemId}/tags`, { tagId }),
   },
 
   customFields: {
     list: () => GET<{ fields: Array<{ id: string; name: string; type: string; required: boolean }> }>('/api/custom-fields').then(r => r.fields),
     create: (data: { name: string; type: string; required?: boolean }) => POST<{ field: { id: string; name: string; type: string; required: boolean } }>('/api/custom-fields', data).then(r => r.field),
-    delete: (id: string) => POST<{ success: boolean }>('/api/custom-fields', { id, _method: 'DELETE' }),
+    delete: (id: string) => request<{ ok: boolean }>('DELETE', '/api/custom-fields', { id }),
   },
 
   itemCustomFields: {

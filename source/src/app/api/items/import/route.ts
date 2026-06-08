@@ -48,7 +48,7 @@ function parseNumber(val: unknown): number | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await authorize(request);
+    const auth = await authorize(request, ['admin']);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const formData = await request.formData();

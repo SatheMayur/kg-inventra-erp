@@ -5,14 +5,14 @@ import { handleApiError, ApiError } from '@/lib/api-utils';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
     if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const { id } = params;
+    const { id } = await params;
 
     const tag = await db.tag.findUnique({ where: { id } });
     if (!tag) throw new ApiError(404, 'Tag not found', 'NOT_FOUND');

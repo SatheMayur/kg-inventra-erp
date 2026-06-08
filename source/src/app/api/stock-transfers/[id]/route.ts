@@ -46,6 +46,10 @@ export async function PATCH(
 
     const existing = await db.stockTransfer.findUnique({ where: { id } });
     if (!existing) throw new ApiError(404, 'Transfer not found', 'NOT_FOUND');
+    if (existing.status !== 'DRAFT') {
+      // Once confirmed/reconciled a transfer is locked — no edits (audit-trail rule).
+      throw new ApiError(400, 'Only draft transfers can be edited', 'BAD_REQUEST');
+    }
 
     const body = await request.json();
     const validated = updateSchema.parse(body);

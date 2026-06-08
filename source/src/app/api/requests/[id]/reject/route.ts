@@ -4,6 +4,7 @@ import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
 import { createNotification } from '@/lib/notifications';
+import { releaseReservation } from '@/lib/stock';
 
 export async function PATCH(
   request: NextRequest,
@@ -27,17 +28,8 @@ export async function PATCH(
         );
       }
 
-      // Release the stock reservation
-      const item = await tx.item.findUnique({ where: { id: req.itemId } });
-      if (item) {
-        await tx.item.update({
-          where: { id: req.itemId },
-          data: {
-            reservedQty: Math.max(0, item.reservedQty - req.qty),
-            version: item.version + 1,
-          },
-        });
-      }
+      // Release the stock reservation (atomic decrement — no lost update)
+      await releaseReservation(tx, req.itemId, req.qty);
 
       return tx.request.update({ where: { id }, data: { status: 'Rejected' } });
     });
