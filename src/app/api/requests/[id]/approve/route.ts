@@ -4,13 +4,14 @@ import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
 import { createNotification } from '@/lib/notifications';
+import { canApproveRequest } from '@/lib/approval';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authorize(request, ['admin']);
+    const auth = await authorize(request); // any authenticated user; dept-head/admin check below
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { id } = await params;
@@ -21,6 +22,16 @@ export async function PATCH(
 
       if (req.status !== 'Pending') {
         throw new ApiError(400, 'Only pending requests can be approved', 'BAD_REQUEST');
+      }
+
+      // Dept-head routing: admin approves anything; a dept head only their own dept.
+      const approver = await tx.user.findUnique({ where: { id: auth.user!.id } });
+      if (!approver) throw new ApiError(401, 'Unknown user', 'UNAUTHORIZED');
+      if (!canApproveRequest(
+        { id: approver.id, role: approver.role, department: approver.department, isDeptHead: approver.isDeptHead },
+        req.department,
+      )) {
+        throw new ApiError(403, 'You can only approve requests for your department', 'FORBIDDEN');
       }
 
       const item = await tx.item.findUnique({ where: { id: req.itemId } });
