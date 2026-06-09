@@ -271,28 +271,46 @@ export function NewRequestDialog({
               className="bg-muted/20 border-border/50 text-sm resize-none"
             />
             {(() => {
-              // Prefix-match common note phrases (e.g. "not w" -> "Not working").
-              // Suggest only; user clicks to fill. Never auto-replaces.
               const SUGGESTIONS = [
                 'Not working', 'Needs repair', 'Replacement for damaged unit',
                 'Urgent requirement', 'New joinee setup', 'Stock running low',
                 'Defective on arrival', 'Routine replenishment',
               ]
-              const q = formNote.trim().toLowerCase()
-              const matches = q
-                ? SUGGESTIONS.filter((s) => s.toLowerCase().startsWith(q) && s.toLowerCase() !== q)
-                : []
-              if (matches.length === 0) return null
+              // Work on the LAST comma/period/newline-delimited segment so suggestions
+              // fire mid-sentence, not only when the whole note is a prefix.
+              const seg = formNote.match(/[^,.\n]*$/)?.[0] ?? ''
+              const core = seg.trim().toLowerCase()
+              const matched = core
+                ? SUGGESTIONS.filter((s) => s.toLowerCase().startsWith(core))
+                : SUGGESTIONS
+              const chips = (matched.length ? matched : SUGGESTIONS).slice(0, 6)
+
+              // Click = complete the partial fragment in place, or append a new
+              // phrase — never overwrite what the user already typed.
+              const apply = (phrase: string) => {
+                const lead = seg.match(/^\s*/)?.[0] ?? ''
+                const base = formNote.slice(0, formNote.length - seg.length)
+                let next: string
+                if (seg.trim() && phrase.toLowerCase().startsWith(seg.trim().toLowerCase())) {
+                  next = base + lead + phrase
+                } else if (!formNote.trim()) {
+                  next = phrase
+                } else {
+                  next = formNote.replace(/\s+$/, '') + ', ' + phrase
+                }
+                setFormNote(next.slice(0, 500))
+              }
+
               return (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {matches.map((s) => (
+                  {chips.map((s) => (
                     <button
                       key={s}
                       type="button"
-                      onClick={() => setFormNote(s)}
+                      onClick={() => apply(s)}
                       className="text-[10px] px-2 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
                     >
-                      {s}
+                      + {s}
                     </button>
                   ))}
                 </div>
