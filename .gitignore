@@ -62,6 +62,10 @@ prisma/*.db-journal
 # Recovered parent-repo backup (un-mix artifact)
 .git_combined_backup/
 
+# AI-memory binary + stray nested SQLite path (not source)
+ruvector.db
+prisma/prisma/
+
 # Skills directory
 /skills/
 # InsForge & AI agent skills
