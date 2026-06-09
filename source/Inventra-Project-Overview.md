@@ -1,99 +1,71 @@
-# Inventra — Inventory & Stock Operations Platform
+# Inventra — Business Asset Overview
 
-**Author:** Mayur Sathe, Developer & Project Lead
+**Asset owner:** Mayur Sathe, Developer & Project Lead
+**What it is:** A web-based inventory system that is the single, role-controlled, auditable source of truth for stock, requests, issuance, transfers, purchase orders, and history — replacing spreadsheets and manual logs.
 
-## Executive summary
-Inventra is a web-based inventory system that tracks stock, requests, issuance, transfers, purchase orders, and audit history in one place. It replaces spreadsheets and manual logs with a single, role-controlled, auditable source of truth.
+> Treated as a business asset, not a project: it runs continuously, has one accountable owner, and is judged by money and risk outcomes reviewed monthly — not by features shipped.
 
-## Objectives
-- Maintain real-time stock accuracy across all items (target: ≥99% vs physical count).
-- Cut stock-out incidents on critical items by ≥50% within 3 months.
-- Route every stock movement (in/out/transfer/checkout) through one ledger (100% coverage).
-- Enforce role-based access on all write actions (0 unauthorized writes).
-- Auto-number purchase orders, gate passes, and challans (0 duplicates).
-- Raise low-stock/reorder alerts within 1 minute of threshold breach.
-- Log every create/update/delete to an audit trail (100% of writes).
-- Serve department, item-flow, and inventory-value reports on demand (<2s load).
-- Support Excel bulk import with per-row validation (reject bad rows, report why).
-- Prevent overselling/double-processing under concurrent use (0 negative-stock events).
-- Block server-side requests to internal/private addresses (0 SSRF exposures).
-- Pass type-check and build on every release (0 type errors).
+## Value scorecard (review monthly)
+| # | Outcome metric | Baseline | Target | Owner |
+|---|----------------|----------|--------|-------|
+| 1 | Working capital tied in stock (₹) | measure (TBD) | −15% in 6 mo | Owner + Purchasing |
+| 2 | Shrinkage / write-off rate (% of stock value) | measure (TBD) | <2% | Owner |
+| 3 | Stock-out rate on critical items (%) | measure (TBD) | −50% in 3 mo | Owner |
+| 4 | Stock accuracy (system vs physical count) | measure (TBD) | ≥99% | Owner |
+| 5 | Staff hours on manual stock admin | ~19 hrs/wk | ~7 hrs/wk | Owner |
+| 6 | Reorder decision latency (low → PO placed) | measure (TBD) | <1 business day | Purchasing |
 
-## Benefits
-**Business**
-- Fewer stock-outs and write-offs; faster fulfilment; reliable data for purchasing; lower audit effort.
-- ~30–40% less time on manual stock reconciliation.
+*Baselines must be measured for ~2 weeks before improvement is claimed.*
 
-**Technical / operational**
-- One shared stock-mutation path → consistent, race-safe inventory math.
-- SSRF guard + role enforcement reduce security exposure.
-- Structured errors + audit log speed up incident diagnosis.
+## Financial impact
+- **Labor reclaimed:** ~31 hrs/mo (~378 hrs/yr). At an assumed ₹300/hr loaded cost ≈ **₹113k/yr** freed.
+- **Working capital:** faster stock-turns release cash currently locked in slow/excess stock.
+- **Loss avoided:** lower shrinkage and fewer stock-outs convert directly to retained margin.
+- **Audit effort:** complete write-level audit trail cuts reconciliation and compliance time.
 
-## Time savings (assumes 1 store, ~500 SKUs, 2 staff)
-| Task | Now | After | Saved/mo | Saved/yr |
-|------|-----|-------|----------|----------|
-| Stock reconciliation | 8 hrs/wk | 5 hrs/wk | ~12 hrs | ~144 hrs |
-| PO + challan + gate-pass paperwork | 5 hrs/wk | 1.5 hrs/wk | ~14 hrs | ~168 hrs |
-| Monthly reporting | 6 hrs/mo | 0.5 hrs/mo | ~5.5 hrs | ~66 hrs |
-| **Total** | | | **~31 hrs** | **~378 hrs** |
+## Outcomes it drives (why it matters)
+- Reliable numbers → better purchasing → less cash locked in stock.
+- Fewer stock-outs → fewer lost sales and rush orders.
+- Lower shrinkage → retained margin.
+- Faster, traceable decisions → less firefighting.
 
-## Requirements — Functional
+## Capabilities (the enablers behind the outcomes)
 - Item master: categories, variants, barcodes, tags, custom fields, photos.
-- Stock movements: restock (IN), issuance (OUT), transfers, checkouts/returns.
+- Stock movements through one ledger: restock (IN), issuance (OUT), transfers, checkouts/returns.
 - Request → approve/reject/cancel → issue, with stock reservation.
-- Purchase orders, goods receipt, invoices, delivery challans, gate passes.
-- Excel bulk import/export with validation.
+- Purchase orders, goods receipt, invoices, delivery challans, gate passes (auto-numbered).
+- Excel bulk import/export with per-row validation.
 - Reports: dashboard, stock-out risk, inventory value, department consumption, audit.
-- Webhooks + Slack/Teams alerts.
+- Low-stock alerts via webhooks + Slack/Teams.
 
-## Requirements — Non-functional
-- Report endpoints respond <2s at typical volumes.
-- Concurrency-safe stock writes (transactional + optimistic locking).
-- Available in business hours; recoverable from backup.
-- Scales single-store → multi-store via managed Postgres path.
-- Consistent, structured API error handling.
+## Requirements (concise)
+- **Non-functional:** reports <2s; concurrency-safe transactional stock writes; business-hours availability + backup recovery; scales single→multi-store via Postgres.
+- **Data & integration:** internal DB (items, transactions, requests, users, audit); REST + Slack/Teams webhooks; optional Petpooja PO sync; JSON + XLSX.
+- **Security & compliance:** JWT + role-based access (admin/employee), admin-only on sensitive writes; SSRF protection on outbound URLs; full audit logging; HTTPS; secrets in env vars.
 
-## Data & Integration
-- Sources: internal app database (items, transactions, requests, users, audit).
-- APIs: internal REST; outbound Slack/Teams webhooks; optional Petpooja PO sync.
-- Sync: real-time on action; alerts near-real-time.
-- Formats: JSON (API), XLSX (import/export).
+## Run cost & ROI
+- **Build (MVP):** ~10–12 dev person-weeks + ~2 QA + ~1 DevOps.
+- **Run:** hosting + maintenance + deferred fixes (report price-at-time, timezone, perf, UI dedup).
+- **ROI test:** monthly value from scorecard (capital freed + loss avoided + labor saved) vs run cost. Asset is "earning" only while the scorecard improves.
 
-## Security & Compliance
-- JWT auth + role-based access (admin / employee); admin-only on sensitive writes.
-- SSRF protection on all user-supplied outbound URLs.
-- Full audit logging of writes (who, what, when).
-- Encryption in transit (HTTPS); secrets via environment variables, never sent to clients.
-
-## Resources & Roles
-- Full-stack developer (Next.js/Prisma): ~10–12 person-weeks (MVP).
-- QA/test: ~2 person-weeks.
-- DevOps (deploy, DB, backups): ~1 person-week.
-
-## Author's contributions — Mayur Sathe, Developer & Project Lead
-- Lead developer: owns architecture and delivery of the Inventra platform.
-- Ran a full security & correctness audit (70+ API routes, 40+ views).
-- Fixed 6 critical bugs: PO-receipt double-stock race, checkout/return not moving stock, SSRF in webhooks/integrations, broken delete operations, async-param routing faults.
-- Built shared helpers (`mutateStock`, `releaseReservation`, SSRF `assertSafeUrl`) to remove duplicated, divergent stock logic.
-- Hardened auth/role checks and input validation across imports, invoices, gate passes, pick lists.
-- Verified all changes via type-check and committed them with documented rationale.
-
-## Timeline
-- MVP (core inventory + requests + reporting): 8–12 weeks.
-- Beta (integrations, hardening, UAT): 3–4 weeks.
-- Rollout (training, production deploy): 2 weeks.
-
-## Risks & Mitigation
+## Risks & mitigation
 - Data accuracy drift → all movements through one ledger + periodic physical counts.
 - Concurrency errors at scale → transactional writes + migrate SQLite→Postgres before multi-store.
 - Adoption resistance → simple UI, role-based views, short training.
 
+## Author's contributions — Mayur Sathe, Developer & Project Lead
+- Lead developer: owns architecture, delivery, and ongoing health of the asset.
+- Full security & correctness audit (70+ API routes, 40+ views).
+- Fixed 6 critical bugs: PO-receipt double-stock race, checkout/return not moving stock, SSRF in webhooks/integrations, broken delete operations, async-param routing faults.
+- Built shared helpers (`mutateStock`, `releaseReservation`, SSRF `assertSafeUrl`) removing duplicated stock logic.
+- Hardened auth/role checks and input validation across imports, invoices, gate passes, pick lists.
+
 ## Next steps
-- Approve scope; confirm single-store vs multi-store target.
-- Finish deferred report fixes (price-at-time, timezone); plan Postgres migration.
-- Schedule UAT with store staff.
+- Measure the 6 baselines (2 weeks) so improvement is provable.
+- Assign the monthly scorecard review to the asset owner.
+- Finish deferred report fixes (price-at-time, timezone) + plan Postgres migration.
 
 ## Assumptions
 - Tech stack: Next.js (App Router) + Prisma + SQLite (Postgres for scale).
-- Volume figures (1 store, ~500 SKUs, 2 staff) and time savings are illustrative — swap in actuals.
+- ₹300/hr loaded labor cost and volume figures (1 store, ~500 SKUs, 2 staff) are illustrative — replace with actuals.
 - Project name "Inventra" taken from the codebase.
