@@ -270,6 +270,34 @@ export function NewRequestDialog({
               rows={3}
               className="bg-muted/20 border-border/50 text-sm resize-none"
             />
+            {(() => {
+              // Prefix-match common note phrases (e.g. "not w" -> "Not working").
+              // Suggest only; user clicks to fill. Never auto-replaces.
+              const SUGGESTIONS = [
+                'Not working', 'Needs repair', 'Replacement for damaged unit',
+                'Urgent requirement', 'New joinee setup', 'Stock running low',
+                'Defective on arrival', 'Routine replenishment',
+              ]
+              const q = formNote.trim().toLowerCase()
+              const matches = q
+                ? SUGGESTIONS.filter((s) => s.toLowerCase().startsWith(q) && s.toLowerCase() !== q)
+                : []
+              if (matches.length === 0) return null
+              return (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {matches.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setFormNote(s)}
+                      className="text-[10px] px-2 py-1 rounded-full border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
             {formNote.length > 0 && (
               <p className="text-[10px] text-muted-foreground/50 text-right">{formNote.length}/500</p>
             )}
