@@ -4,6 +4,7 @@ import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
 import { createNotification } from '@/lib/notifications';
+import { checkReorder } from '@/lib/reorder';
 
 export async function PATCH(
   request: NextRequest,
@@ -65,6 +66,9 @@ export async function PATCH(
           userId: req.userId,
         },
       });
+
+      // Auto-create a reorder PO if this issue dropped the item to its threshold
+      await checkReorder(tx, req.itemId);
 
       const updatedRequest = await tx.request.update({
         where: { id },

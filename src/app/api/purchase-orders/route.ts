@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
-import { handleApiError } from '@/lib/api-utils';
+import { ApiError, handleApiError } from '@/lib/api-utils';
+import { createAuditLog, AuditAction } from '@/lib/audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,43 +35,53 @@ export async function POST(request: NextRequest) {
     if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 
     const body = await request.json();
-    const { supplierId, items, notes } = body; // items: Array<{ itemId: string, qty: number, unitPrice: number }>
+    const { supplierId, items, notes } = body as {
+      supplierId?: string
+      items?: { itemId: string; qty: number; unitPrice: number }[]
+      notes?: string
+    };
 
-    if (!supplierId || !items || items.length === 0) {
-      return NextResponse.json({ error: 'Supplier and items are required' }, { status: 400 });
+    if (!supplierId || !Array.isArray(items) || items.length === 0) {
+      throw new ApiError(400, 'Supplier and at least one item are required', 'BAD_REQUEST');
+    }
+    for (const i of items) {
+      if (!i.itemId || typeof i.qty !== 'number' || i.qty <= 0 || typeof i.unitPrice !== 'number' || i.unitPrice < 0) {
+        throw new ApiError(400, 'Each line needs itemId, qty > 0 and unitPrice >= 0', 'BAD_REQUEST');
+      }
     }
 
     const supplier = await db.supplier.findUnique({ where: { id: supplierId } });
-    if (!supplier) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
+    if (!supplier) throw new ApiError(404, 'Supplier not found', 'NOT_FOUND');
 
-    // Generate PO Number: PO-YYYYMMDD-XXXX
+    // Generate PO Number: PO-YYYYMMDD-XXX
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const count = await db.purchaseOrder.count({
-      where: { poNumber: { startsWith: `PO-${date}` } }
-    });
+    const count = await db.purchaseOrder.count({ where: { poNumber: { startsWith: `PO-${date}` } } });
     const poNumber = `PO-${date}-${(count + 1).toString().padStart(3, '0')}`;
 
-    const totalAmount = items.reduce((sum: number, i: any) => sum + (i.qty * i.unitPrice), 0);
+    const totalAmount = items.reduce((sum, i) => sum + i.qty * i.unitPrice, 0);
+
+    // Budget gate: POs above the approval limit must be approved before they can be SENT.
+    const limit = Number(process.env.PO_APPROVAL_LIMIT ?? 50000);
+    const status = totalAmount > limit ? 'PENDING_APPROVAL' : 'SENT';
 
     const po = await db.purchaseOrder.create({
       data: {
         poNumber,
         supplierId,
-        notes,
+        notes: notes ?? null,
         totalAmount,
-        status: 'SENT', // Defaulting to SENT for simplicity in this demo
-        items: {
-          create: items.map((i: any) => ({
-            itemId: i.itemId,
-            qty: i.qty,
-            unitPrice: i.unitPrice
-          }))
-        }
+        status,
+        items: { create: items.map((i) => ({ itemId: i.itemId, qty: i.qty, unitPrice: i.unitPrice })) },
       },
-      include: {
-        supplier: true,
-        items: { include: { item: true } }
-      }
+      include: { supplier: true, items: { include: { item: true } } },
+    });
+
+    await createAuditLog({
+      action: 'CREATE_PO' as AuditAction,
+      user: auth.user,
+      targetId: po.id,
+      targetName: poNumber,
+      metadata: { totalAmount, status },
     });
 
     return NextResponse.json({ po });

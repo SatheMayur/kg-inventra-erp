@@ -4,6 +4,7 @@ import { authorize } from '@/lib/auth';
 import { handleApiError, ApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
 import { mutateStock } from '@/lib/stock';
+import { checkReorder } from '@/lib/reorder';
 
 export async function PATCH(
   request: NextRequest,
@@ -40,6 +41,7 @@ export async function PATCH(
           reference: `Transfer ${transfer.memoNumber} → ${transfer.toLocation}`,
           userId: auth.user?.id,
         });
+        await checkReorder(tx, ti.itemId);
       }
 
       return tx.stockTransfer.update({

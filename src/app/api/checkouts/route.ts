@@ -5,6 +5,7 @@ import { handleApiError } from '@/lib/api-utils';
 import { z } from 'zod';
 import { createAuditLog, AuditAction } from '@/lib/audit';
 import { mutateStock } from '@/lib/stock';
+import { checkReorder } from '@/lib/reorder';
 
 const createCheckoutSchema = z.object({
   itemId: z.string().min(1, 'Item is required'),
@@ -94,6 +95,8 @@ export async function POST(request: NextRequest) {
         reference: `Checkout ${created.id}`,
         userId: auth.user!.id,
       });
+
+      await checkReorder(tx, validated.itemId);
 
       return created;
     });
