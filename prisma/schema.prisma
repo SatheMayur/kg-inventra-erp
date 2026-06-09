@@ -14,6 +14,7 @@ model User {
   department String
   floor      String   @default("")
   role       String   @default("employee") // admin | employee
+  isDeptHead Boolean  @default(false)       // can approve requests for own department
   password   String   // hashed in production; plaintext for demo
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
