@@ -363,6 +363,7 @@ model MaintenanceSchedule {
   lastCompleted DateTime?
   status        String    @default("PENDING")
   notes         String?
+  assetId       String?                           // optional link to an Asset (reuse maintenance for assets)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   item          Item      @relation(fields: [itemId], references: [id])
@@ -377,4 +378,22 @@ model Webhook {
   secret    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Asset {
+  id               String    @id @default(cuid())
+  name             String
+  serialNumber     String    @unique
+  itemId           String?                       // optional link to catalog Item
+  status           String    @default("IN_STOCK") // IN_STOCK | ASSIGNED | MAINTENANCE | RETIRED
+  assignedToUserId String?                       // employee the unit is assigned to
+  assignedAt       DateTime?
+  warrantyExpiry   DateTime?
+  licenseExpiry    DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status])
+  @@index([assignedToUserId])
 }
