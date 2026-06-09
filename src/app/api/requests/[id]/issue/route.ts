@@ -25,8 +25,8 @@ export async function PATCH(
       const req = await tx.request.findUnique({ where: { id } });
       if (!req) throw new ApiError(404, 'Request not found', 'NOT_FOUND');
 
-      if (req.status !== 'Approved') {
-        throw new ApiError(400, 'Only approved requests can be issued', 'BAD_REQUEST');
+      if (req.status !== 'Approved' && req.status !== 'ReadyForPickup') {
+        throw new ApiError(400, 'Only approved or ready-for-pickup requests can be issued', 'BAD_REQUEST');
       }
 
       const item = await tx.item.findUnique({ where: { id: req.itemId } });
