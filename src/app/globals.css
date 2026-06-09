@@ -1,0 +1,284 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-instrument-serif);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/* ── Inventra glassmorphism theme ────────────────────────────────── */
+:root {
+  --radius: 0.5rem;
+  --background: rgba(242, 242, 247, 0.45);
+  --foreground: #292524;
+  --card: rgba(255, 255, 255, 0.50);
+  --card-foreground: #292524;
+  --popover: rgba(255, 255, 255, 0.84);
+  --popover-foreground: #292524;
+  --primary: #1E1B4B;
+  --primary-foreground: #FFFFFF;
+  --secondary: rgba(245, 245, 244, 0.48);
+  --secondary-foreground: #292524;
+  --muted: rgba(245, 245, 244, 0.48);
+  --muted-foreground: #78716C;
+  --accent: rgba(254, 243, 199, 0.70);
+  --accent-foreground: #92400E;
+  --destructive: #DC2626;
+  --border: rgba(255, 255, 255, 0.45);
+  --input: rgba(231, 229, 228, 0.80);
+  --ring: #1E1B4B;
+  --chart-1: #1E1B4B;
+  --chart-2: #F59E0B;
+  --chart-3: #16A34A;
+  --chart-4: #DC2626;
+  --chart-5: #7C3AED;
+  --sidebar: rgba(255, 255, 255, 0.55);
+  --sidebar-foreground: #292524;
+  --sidebar-primary: #1E1B4B;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(238, 238, 248, 0.60);
+  --sidebar-accent-foreground: #1E1B4B;
+  --sidebar-border: rgba(255, 255, 255, 0.35);
+  --sidebar-ring: #1E1B4B;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* ── Fixed gradient canvas ───────────────────────────────────────── */
+/* Unlayered — beats @layer utilities, overrides bg-background on body */
+body {
+  background:
+    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(99, 102, 241, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(245, 158, 11, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 80% at 50% 40%, rgba(30, 27, 75, 0.20) 0%, transparent 65%),
+    #F2F2F7;
+  background-attachment: fixed;
+}
+
+/* ── Opt-in serif display classes ────────────────────────────────── */
+.font-serif-italic {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
+.font-serif {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+/* ── Sidebar active indicator ────────────────────────────────────── */
+[data-sidebar="menu-button"][data-active="true"] {
+  border-left: 2px solid #1E1B4B;
+  border-radius: 0 6px 6px 0;
+}
+
+/* ── Enterprise table ────────────────────────────────────────────── */
+.enterprise-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(245, 245, 244, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.enterprise-table thead th {
+  border-bottom: 1px solid rgba(231, 229, 228, 0.60);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #78716C;
+  padding: 0.5rem 0.75rem;
+}
+.enterprise-table tbody td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(245, 245, 244, 0.80);
+}
+.enterprise-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.enterprise-table tbody tr:hover td {
+  background-color: rgba(99, 102, 241, 0.04);
+}
+
+/* ── Glass depth system ──────────────────────────────────────────── */
+
+/* ── Blur hierarchy: base 12px → +2px per level ─────────────────── */
+/*   Base   (sidebar, header):  12px                                 */
+/*   Level 1 (cards):           14px                                 */
+/*   Level 2 (popovers):        16px                                 */
+/*   Level 3 (dialogs):         18px                                 */
+/*   Level 4 (tooltips):        20px                                 */
+
+/* All bg-card elements — covers manual divs + shadcn Cards */
+.bg-card {
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+/* Main content area: transparent so gradient shows through */
+[data-slot="sidebar-inset"] {
+  background: transparent !important;
+}
+
+/* Level 1: Shadcn Card component (14px) */
+[data-slot="card"] {
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  border: 2px solid rgba(255, 255, 255, 0.50);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.80),
+    0 2px 2px rgba(0, 0, 0, 0.02),
+    0 4px 16px rgba(0, 0, 0, 0.04),
+    0 0 0 0.5px rgba(0, 0, 0, 0.03);
+}
+
+/* Level 2: Popover / dropdown (16px) */
+[data-slot="popover-content"],
+[role="menu"],
+[role="listbox"],
+[data-radix-popper-content-wrapper] > * {
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+
+/* Level 3: Dialog / Sheet (18px) */
+[data-slot="dialog-content"],
+[data-slot="sheet-content"] {
+  background: rgba(255, 255, 255, 0.80) !important;
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    0 24px 64px rgba(0, 0, 0, 0.10),
+    0 8px 24px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+
+/* Dialog overlay: subtle navy tint instead of dark block */
+[data-slot="dialog-overlay"] {
+  background: rgba(30, 27, 75, 0.12) !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* Base: Sticky header (12px) */
+header.sticky {
+  background: rgba(255, 255, 255, 0.60) !important;
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.70), 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+/* Base: Sidebar (12px) */
+[data-sidebar="sidebar"] {
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border-right: 2px solid rgba(255, 255, 255, 0.40) !important;
+}
+
+/* Level 4: Tooltip (20px — darkest, most crisp) */
+[data-slot="tooltip-content"] {
+  background: rgba(30, 27, 75, 0.88) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+
+/* ── Legacy opacity normalizers ──────────────────────────────────── */
+.bg-card\/30,
+.bg-card\/20,
+.bg-card\/40,
+.bg-card\/50 {
+  background-color: var(--card);
+}
+.bg-secondary\/20,
+.bg-secondary\/10 {
+  background-color: var(--secondary);
+}
+
+/* ── Tabular numbers ─────────────────────────────────────────────── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Glass card helper ───────────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.62);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(245, 245, 244, 0.60);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(214, 211, 209, 0.80);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A8A29E;
+}

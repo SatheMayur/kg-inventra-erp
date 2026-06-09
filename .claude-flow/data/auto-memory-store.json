@@ -1,0 +1,14 @@
+[
+  {
+    "id": "task-mis-dashboard-build",
+    "key": "mis-dashboard-build",
+    "content": "Task completed: mis-dashboard-build",
+    "namespace": "tasks",
+    "type": "task-outcome",
+    "metadata": {
+      "success": true,
+      "quality": 0.85
+    },
+    "createdAt": 1779537330765
+  }
+]
