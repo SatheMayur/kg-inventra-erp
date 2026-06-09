@@ -100,7 +100,7 @@ export interface RequestResponse {
   itemName: string
   qty: number
   note: string | null
-  status: 'Pending' | 'Approved' | 'Issued' | 'Rejected' | 'Cancelled'
+  status: 'Pending' | 'Approved' | 'ReadyForPickup' | 'Issued' | 'Rejected' | 'Cancelled'
   issuedAt: string | null
   issuedBy: string | null
   createdAt: string
@@ -469,6 +469,10 @@ export const api = {
     issue: async (id: string, expectedVersion: number, issuedBy: string, userId: string): Promise<{ request: RequestResponse; item: ItemResponse }> => {
       const res = await PATCH<{ request: RequestResponse; item: ItemResponse }>(`/api/requests/${id}/issue`, { expectedVersion, issuedBy, userId })
       return res
+    },
+    markReady: async (id: string): Promise<RequestResponse> => {
+      const res = await PATCH<{ request: RequestResponse }>(`/api/requests/${id}/ready`)
+      return res.request
     },
   },
 

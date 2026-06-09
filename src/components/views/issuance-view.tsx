@@ -47,6 +47,7 @@ function statusBadge(status: Status) {
   const map: Record<Status, string> = {
     Pending: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
     Approved: 'bg-sky-500/10 text-sky-700 border-sky-500/20',
+    ReadyForPickup: 'bg-violet-500/10 text-violet-700 border-violet-500/20',
     Issued: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
     Rejected: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
     Cancelled: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
@@ -108,14 +109,18 @@ export default function IssuanceView() {
   const fetchRequests = useCallback(async () => {
     try {
       // Fetch both Pending and Approved requests
-      const [pending, approved] = await Promise.all([
+      const [pending, approved, ready] = await Promise.all([
         api.requests.list({ status: 'Pending' }),
         api.requests.list({ status: 'Approved' }),
+        api.requests.list({ status: 'ReadyForPickup' }),
       ])
-      // Sort: Pending first, then Approved; within each, newest first
+      // Sort: Pending, then Approved, then ReadyForPickup; within each, newest first
+      const byNewest = (a: RequestResponse, b: RequestResponse) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       const sorted = [
-        ...pending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-        ...approved.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        ...pending.sort(byNewest),
+        ...approved.sort(byNewest),
+        ...ready.sort(byNewest),
       ]
       setRequests(sorted)
     } catch {
@@ -181,6 +186,20 @@ export default function IssuanceView() {
       await refreshPendingBadge()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to approve')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleReady(id: string) {
+    setActionLoading(id)
+    try {
+      await api.requests.markReady(id)
+      toast.success('Marked ready for pickup')
+      await fetchRequests()
+      await refreshPendingBadge()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to mark ready')
     } finally {
       setActionLoading(null)
     }
@@ -465,8 +484,19 @@ export default function IssuanceView() {
                               </Button>
                             </>
                           )}
-                          {req.status === 'Approved' && (
+                          {(req.status === 'Approved' || req.status === 'ReadyForPickup') && (
                             <>
+                              {req.status === 'Approved' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 gap-1"
+                                  disabled={!!actionLoading}
+                                  onClick={() => handleReady(req.id)}
+                                >
+                                  <span className="hidden sm:inline">Mark ready</span>
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 className="h-7 px-2.5 gap-1 bg-primary text-primary-foreground hover:bg-primary/90"

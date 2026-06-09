@@ -23,6 +23,7 @@ function statusBadge(status: Status) {
   const map: Record<Status, string> = {
     Pending:   'bg-amber-500/10 text-amber-700 border-amber-500/20',
     Approved:  'bg-sky-500/10 text-sky-700 border-sky-500/20',
+    ReadyForPickup: 'bg-violet-500/10 text-violet-700 border-violet-500/20',
     Issued:    'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
     Rejected:  'bg-rose-500/10 text-rose-700 border-rose-500/20',
     Cancelled: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
