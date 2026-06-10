@@ -171,6 +171,16 @@ export default function ProcurementView() {
     }
   }
 
+  const handleApprovePO = async (id: string) => {
+    try {
+      await api.procurement.pos.approve(id)
+      toast.success('Purchase order approved')
+      fetchData()
+    } catch {
+      toast.error('Failed to approve PO')
+    }
+  }
+
   const handleCreateInvoice = async () => {
     if (!invoiceData.invoiceNumber || !invoiceData.purchaseOrderId || invoiceData.amount <= 0) {
       toast.error('Please fill in all required invoice details')
@@ -336,10 +346,19 @@ export default function ProcurementView() {
                         </TableCell>
                         <TableCell>{getStatusBadge(po.status)}</TableCell>
                         <TableCell className="text-right">
-                          {po.status === 'SENT' ? (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
+                          {po.status === 'PENDING_APPROVAL' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-lg border-primary/20 text-primary hover:bg-primary/10 gap-1.5"
+                              onClick={() => handleApprovePO(po.id)}
+                            >
+                              <span className="text-[10px] font-bold uppercase tracking-wider">Approve</span>
+                            </Button>
+                          ) : po.status === 'SENT' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
                               className="h-8 rounded-lg border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10 gap-1.5"
                               onClick={() => handleReceivePO(po.id)}
                             >

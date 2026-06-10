@@ -583,6 +583,7 @@ export const api = {
       create: (data: { supplierId: string, notes?: string, totalAmount?: number, items: Array<{ itemId: string, qty: number, unitPrice: number }> }) =>
         POST<{ po: POResponse }>('/api/purchase-orders', data).then(res => res.po),
       receive: (id: string) => PATCH<{ po: POResponse }>(`/api/purchase-orders/${id}/receive`).then(res => res.po),
+      approve: (id: string) => POST<{ po: POResponse }>(`/api/purchase-orders/${id}/approve`).then(res => res.po),
     },
     invoices: {
       list: () => GET<InvoiceResponse[]>('/api/invoices'),
