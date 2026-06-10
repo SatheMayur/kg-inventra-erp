@@ -40,30 +40,42 @@ const FLAGS = [
 async function main() {
   console.log('Seeding database...')
 
-  for (const u of USERS) {
-    const hashed = hashPassword(u.password)
-    await prisma.user.upsert({
-      where: { empId: u.empId },
-      update: { password: hashed },
-      create: { ...u, password: hashed, active: true },
-    })
-  }
-
-  for (const item of ITEMS) {
-    const existing = await prisma.item.findFirst({
-      where: { name: item.name, category: item.category, deletedAt: null },
-    })
-    if (!existing) {
-      await prisma.item.create({ data: { ...item, reservedQty: 0, version: 1 } })
-    }
-  }
-
+  // Feature flags are always needed by the app.
   for (const flag of FLAGS) {
-    await prisma.featureFlag.upsert({
-      where: { key: flag.key },
-      update: {},
-      create: flag,
+    await prisma.featureFlag.upsert({ where: { key: flag.key }, update: {}, create: flag })
+  }
+
+  const adminEmpId = process.env.ADMIN_EMPID
+  const adminPassword = process.env.ADMIN_PASSWORD
+
+  if (adminEmpId && adminPassword) {
+    // Production handover: a single admin from env. No default passwords, no demo data.
+    const hashed = hashPassword(adminPassword)
+    await prisma.user.upsert({
+      where: { empId: adminEmpId },
+      update: { password: hashed, role: 'admin', active: true },
+      create: {
+        empId: adminEmpId,
+        name: process.env.ADMIN_NAME || 'Administrator',
+        department: process.env.ADMIN_DEPARTMENT || 'Admin',
+        floor: '',
+        role: 'admin',
+        password: hashed,
+        active: true,
+      },
     })
+    console.log(`Seeded production admin "${adminEmpId}".`)
+  } else {
+    // Dev fallback ONLY — insecure demo users (pass123) + sample catalog. Never in production.
+    for (const u of USERS) {
+      const hashed = hashPassword(u.password)
+      await prisma.user.upsert({ where: { empId: u.empId }, update: { password: hashed }, create: { ...u, password: hashed, active: true } })
+    }
+    for (const item of ITEMS) {
+      const existing = await prisma.item.findFirst({ where: { name: item.name, category: item.category, deletedAt: null } })
+      if (!existing) await prisma.item.create({ data: { ...item, reservedQty: 0, version: 1 } })
+    }
+    console.log('Seeded DEV demo users (pass123) + sample items — insecure, dev only.')
   }
 
   console.log('Seeding complete.')

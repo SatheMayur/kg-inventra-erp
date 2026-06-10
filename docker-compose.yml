@@ -7,8 +7,12 @@ services:
       - "8080:3000"   # host 8080 -> container 3000 (host 3000 reserved by Windows winnat)
     environment:
       DATABASE_URL: "file:/app/data/inventra.db"
-      JWT_SECRET: "CHANGE-ME-docker-dev-secret-0123456789abcdef0123456789abcdef"
+      JWT_SECRET: "${JWT_SECRET:?Set JWT_SECRET in .env — generate: openssl rand -hex 32}"
       NODE_ENV: "production"
+      ADMIN_EMPID: "${ADMIN_EMPID:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}"
+      ADMIN_NAME: "${ADMIN_NAME:-Administrator}"
+      SEED_DEMO: "${SEED_DEMO:-false}"
     volumes:
       - inventra-data:/app/data
     restart: unless-stopped
