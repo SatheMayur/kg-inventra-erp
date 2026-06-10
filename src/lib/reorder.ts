@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client'
+import { randomBytes } from 'crypto'
 
 export interface ReorderItem {
   stock: number
@@ -51,9 +52,12 @@ export async function checkReorder(tx: Tx, itemId: string): Promise<void> {
     return
   }
 
-  const count = await tx.purchaseOrder.count()
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const poNumber = `PO-AUTO-${date}-${String(count + 1).padStart(3, '0')}`
+  // Random suffix (not a row count): checkReorder runs inside the stock-out
+  // transaction, so a duplicate poNumber would throw P2002 and roll back the
+  // entire issue/checkout/transfer — failing a legitimate operation under any
+  // concurrency. A random token makes that collision negligible.
+  const poNumber = `PO-AUTO-${date}-${randomBytes(4).toString('hex')}`
   const unitPrice = Math.max(0, Math.round(item.price || 0))
 
   await tx.purchaseOrder.create({
