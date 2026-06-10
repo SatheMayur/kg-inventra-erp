@@ -84,6 +84,7 @@ import PickListView from '@/components/views/pick-list-view'
 import AlertsView from '@/components/views/alerts-view'
 import IntegrationsView from '@/components/views/integrations-view'
 import { BarcodeListener } from '@/components/barcode-listener'
+import { CommandBar } from '@/components/command-bar'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { NotificationCenter } from '@/components/notifications/NotificationCenter'
 
@@ -409,6 +410,7 @@ export default function AppShell() {
   return (
     <SidebarProvider>
       <BarcodeListener />
+      <CommandBar />
       {/* Sidebar */}
       <Sidebar collapsible="icon" className="border-r border-sidebar-border bg-sidebar">
         {/* Header */}
