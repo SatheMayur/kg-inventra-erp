@@ -5,6 +5,7 @@ import Image from 'next/image'
 import {
   LayoutDashboard,
   Package,
+  Cpu,
   ClipboardList,
   HandHeart,
   ArrowRightLeft,
@@ -83,6 +84,7 @@ import CheckoutView from '@/components/views/checkout-view'
 import PickListView from '@/components/views/pick-list-view'
 import AlertsView from '@/components/views/alerts-view'
 import IntegrationsView from '@/components/views/integrations-view'
+import AssetsView from '@/components/views/assets-view'
 import { BarcodeListener } from '@/components/barcode-listener'
 import { CommandBar } from '@/components/command-bar'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -126,6 +128,12 @@ const VIEW_CONFIG: Record<string, { label: string; roles: string[]; icon: React.
     roles: ['admin'],
     icon: <FileSpreadsheet className="size-4" />,
     subtitle: 'Bulk import items from spreadsheet'
+  },
+  assets: {
+    label: 'IT Assets',
+    roles: ['admin'],
+    icon: <Cpu className="size-4" />,
+    subtitle: 'Serialized equipment & assignments'
   },
   tags: {
     label: 'Tags',
@@ -285,6 +293,8 @@ function ViewRenderer({ view, user, onPitchModeChange }: { view: string; user: a
       return <StockTransferView />
     case 'import':
       return <ImportView />
+    case 'assets':
+      return <AssetsView />
     case 'tags':
       return <TagsView />
     case 'custom-fields':
