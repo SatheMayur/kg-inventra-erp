@@ -40,13 +40,34 @@ export async function GET(request: NextRequest) {
       status: s.status,
     }));
 
-    const alerts = [...lowStockAlerts, ...maintenanceMapped];
+    // Warranty / license expiry alerts (expiring within 30 days or already expired)
+    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const expiringAssets = await db.asset.findMany({
+      where: {
+        status: { not: 'RETIRED' },
+        OR: [
+          { warrantyExpiry: { lte: thirtyDaysFromNow } },
+          { licenseExpiry: { lte: thirtyDaysFromNow } },
+        ],
+      },
+    });
+    const expiryAlerts = expiringAssets.map((a) => ({
+      type: 'EXPIRY' as const,
+      assetId: a.id,
+      name: a.name,
+      serialNumber: a.serialNumber,
+      warrantyExpiry: a.warrantyExpiry,
+      licenseExpiry: a.licenseExpiry,
+    }));
+
+    const alerts = [...lowStockAlerts, ...maintenanceMapped, ...expiryAlerts];
 
     return NextResponse.json({
       alerts,
       counts: {
         lowStock: lowStockAlerts.length,
         maintenance: maintenanceMapped.length,
+        expiry: expiryAlerts.length,
         total: alerts.length,
       },
     });

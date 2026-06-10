@@ -31,6 +31,8 @@ export async function PATCH(
       });
       if (claim.count === 0) throw new ApiError(409, 'PO already received', 'CONFLICT');
 
+      await tx.purchaseOrder.update({ where: { id: poId }, data: { receivedAt: new Date() } });
+
       for (const poItem of po.items) {
         // mutateStock throws if a PO line's item was deleted — aborting the whole
         // receive rather than silently skipping the line and losing that stock.
@@ -47,6 +49,8 @@ export async function PATCH(
             data: { price: poItem.unitPrice },
           });
         }
+
+        await tx.pOItem.update({ where: { id: poItem.id }, data: { receivedQty: poItem.qty } });
 
         await tx.auditLog.create({
           data: {
