@@ -265,7 +265,7 @@ export interface POResponse {
   id: string
   poNumber: string
   supplierId: string
-  status: 'DRAFT' | 'SENT' | 'RECEIVED' | 'CANCELLED'
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'SENT' | 'RECEIVED' | 'CANCELLED'
   totalAmount: number
   notes: string | null
   createdAt: string
