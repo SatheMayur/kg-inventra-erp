@@ -87,17 +87,10 @@ export default function LoginScreen() {
         >
           {/* Logo */}
           <div className="mb-7 flex flex-col items-center gap-3">
-            <Image
-              src="/inventra-logo.png"
-              alt="Inventra"
-              width={80}
-              height={80}
-              className="rounded-2xl select-none shadow-lg shadow-primary/10"
-              priority
-            />
+            <span className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-xl font-bold tracking-tight shadow-lg shadow-primary/15 select-none">KG</span>
             <div className="text-center">
-              <p className="text-base font-bold tracking-tight text-primary">inventra</p>
-              <p className="text-[11px] text-muted-foreground">Operational Intelligence Platform</p>
+              <p className="text-lg font-semibold tracking-tight">KG<span className="text-primary">_</span>inventra</p>
+              <p className="text-[11px] text-muted-foreground">Inventory ERP · Bangalore</p>
             </div>
           </div>
 
@@ -106,7 +99,7 @@ export default function LoginScreen() {
           {/* Heading */}
           <div className="mb-5">
             <h1 className="text-xl font-semibold text-foreground">Sign in to continue</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">Operations Suite · Inventra v1.0</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Operations Suite · KG_inventra v1.0</p>
           </div>
 
           {/* Form */}
@@ -189,7 +182,7 @@ export default function LoginScreen() {
             All systems operational
           </span>
           <span>·</span>
-          <span>Inventra · Internal Tool</span>
+          <span>KG_inventra · Internal Tool</span>
         </div>
       </div>
     </div>

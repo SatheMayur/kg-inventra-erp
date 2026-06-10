@@ -418,17 +418,10 @@ export default function AppShell() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" className="gap-3 hover:bg-transparent cursor-default select-none">
-                <Image
-                  src="/inventra-logo.png"
-                  alt="Inventra"
-                  width={32}
-                  height={32}
-                  className="rounded-lg shrink-0 select-none"
-                  priority
-                />
+                <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-bold shrink-0 select-none">KG</span>
                 <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
-                  <span className="font-semibold text-sm tracking-tight text-primary">inventra</span>
-                  <span className="text-[10px] text-muted-foreground">Operational Intelligence</span>
+                  <span className="font-semibold text-sm tracking-tight">KG<span className="text-primary">_</span>inventra</span>
+                  <span className="text-[10px] text-muted-foreground">Inventory ERP</span>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>

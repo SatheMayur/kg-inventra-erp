@@ -44,40 +44,40 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* ── Inventra glassmorphism theme ────────────────────────────────── */
+/* ── KG_inventra — premium light theme (teal) ────────────────────── */
 :root {
   --radius: 0.5rem;
-  --background: rgba(242, 242, 247, 0.45);
-  --foreground: #292524;
-  --card: rgba(255, 255, 255, 0.50);
-  --card-foreground: #292524;
-  --popover: rgba(255, 255, 255, 0.84);
-  --popover-foreground: #292524;
-  --primary: #1E1B4B;
+  --background: #FBFBFA;
+  --foreground: #1A1A1A;
+  --card: #FFFFFF;
+  --card-foreground: #1A1A1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A1A;
+  --primary: #0E7C86;
   --primary-foreground: #FFFFFF;
-  --secondary: rgba(245, 245, 244, 0.48);
-  --secondary-foreground: #292524;
-  --muted: rgba(245, 245, 244, 0.48);
-  --muted-foreground: #78716C;
-  --accent: rgba(254, 243, 199, 0.70);
-  --accent-foreground: #92400E;
+  --secondary: #F4F4F3;
+  --secondary-foreground: #1A1A1A;
+  --muted: #F4F4F3;
+  --muted-foreground: #6B7280;
+  --accent: #E6F4F4;
+  --accent-foreground: #0E7C86;
   --destructive: #DC2626;
-  --border: rgba(255, 255, 255, 0.45);
-  --input: rgba(231, 229, 228, 0.80);
-  --ring: #1E1B4B;
-  --chart-1: #1E1B4B;
-  --chart-2: #F59E0B;
+  --border: #E8E8E6;
+  --input: #E2E2DF;
+  --ring: #0E7C86;
+  --chart-1: #0E7C86;
+  --chart-2: #6366F1;
   --chart-3: #16A34A;
-  --chart-4: #DC2626;
-  --chart-5: #7C3AED;
-  --sidebar: rgba(255, 255, 255, 0.55);
-  --sidebar-foreground: #292524;
-  --sidebar-primary: #1E1B4B;
+  --chart-4: #F59E0B;
+  --chart-5: #DC2626;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1A1A1A;
+  --sidebar-primary: #0E7C86;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: rgba(238, 238, 248, 0.60);
-  --sidebar-accent-foreground: #1E1B4B;
-  --sidebar-border: rgba(255, 255, 255, 0.35);
-  --sidebar-ring: #1E1B4B;
+  --sidebar-accent: #F1F7F7;
+  --sidebar-accent-foreground: #0E7C86;
+  --sidebar-border: #ECECEA;
+  --sidebar-ring: #0E7C86;
 }
 
 @layer base {
@@ -87,18 +87,13 @@
   body {
     @apply text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
-/* ── Fixed gradient canvas ───────────────────────────────────────── */
-/* Unlayered — beats @layer utilities, overrides bg-background on body */
+/* Flat premium canvas — no gradient, no glass. */
 body {
-  background:
-    radial-gradient(ellipse 80% 60% at 0% 0%, rgba(99, 102, 241, 0.35) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(245, 158, 11, 0.28) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 80% at 50% 40%, rgba(30, 27, 75, 0.20) 0%, transparent 65%),
-    #F2F2F7;
-  background-attachment: fixed;
+  background: var(--background);
 }
 
 /* ── Opt-in serif display classes ────────────────────────────────── */
@@ -112,10 +107,59 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* ── Sidebar active indicator ────────────────────────────────────── */
+/* ── Sidebar ─────────────────────────────────────────────────────── */
+[data-sidebar="sidebar"] {
+  border-right: 1px solid var(--sidebar-border) !important;
+}
 [data-sidebar="menu-button"][data-active="true"] {
-  border-left: 2px solid #1E1B4B;
+  border-left: 2px solid var(--primary);
   border-radius: 0 6px 6px 0;
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+
+/* ── Surfaces: solid, hairline border, soft shadow (Linear/Vercel) ─ */
+[data-slot="card"] {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+[data-slot="popover-content"],
+[role="menu"],
+[role="listbox"],
+[data-radix-popper-content-wrapper] > * {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+[data-slot="dialog-content"],
+[data-slot="sheet-content"] {
+  background: var(--popover) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-slot="dialog-overlay"] {
+  background: rgba(17, 17, 17, 0.35) !important;
+}
+
+[data-slot="sidebar-inset"] {
+  background: var(--background) !important;
+}
+
+header.sticky {
+  background: rgba(251, 251, 250, 0.85) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border) !important;
+}
+
+[data-slot="tooltip-content"] {
+  background: var(--foreground) !important;
+  color: var(--background);
+  border: none;
 }
 
 /* ── Enterprise table ────────────────────────────────────────────── */
@@ -123,123 +167,29 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(245, 245, 244, 0.82);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--background);
 }
 .enterprise-table thead th {
-  border-bottom: 1px solid rgba(231, 229, 228, 0.60);
+  border-bottom: 1px solid var(--border);
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #78716C;
+  color: var(--muted-foreground);
   padding: 0.5rem 0.75rem;
 }
 .enterprise-table tbody td {
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid rgba(245, 245, 244, 0.80);
+  border-bottom: 1px solid var(--border);
 }
 .enterprise-table tbody tr:last-child td {
   border-bottom: none;
 }
 .enterprise-table tbody tr:hover td {
-  background-color: rgba(99, 102, 241, 0.04);
+  background-color: rgba(14, 124, 134, 0.05);
 }
 
-/* ── Glass depth system ──────────────────────────────────────────── */
-
-/* ── Blur hierarchy: base 12px → +2px per level ─────────────────── */
-/*   Base   (sidebar, header):  12px                                 */
-/*   Level 1 (cards):           14px                                 */
-/*   Level 2 (popovers):        16px                                 */
-/*   Level 3 (dialogs):         18px                                 */
-/*   Level 4 (tooltips):        20px                                 */
-
-/* All bg-card elements — covers manual divs + shadcn Cards */
-.bg-card {
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-}
-
-/* Main content area: transparent so gradient shows through */
-[data-slot="sidebar-inset"] {
-  background: transparent !important;
-}
-
-/* Level 1: Shadcn Card component (14px) */
-[data-slot="card"] {
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  border: 2px solid rgba(255, 255, 255, 0.50);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.80),
-    0 2px 2px rgba(0, 0, 0, 0.02),
-    0 4px 16px rgba(0, 0, 0, 0.04),
-    0 0 0 0.5px rgba(0, 0, 0, 0.03);
-}
-
-/* Level 2: Popover / dropdown (16px) */
-[data-slot="popover-content"],
-[role="menu"],
-[role="listbox"],
-[data-radix-popper-content-wrapper] > * {
-  backdrop-filter: blur(16px) saturate(160%);
-  -webkit-backdrop-filter: blur(16px) saturate(160%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(0, 0, 0, 0.05),
-    0 0 0 0.5px rgba(0, 0, 0, 0.05);
-}
-
-/* Level 3: Dialog / Sheet (18px) */
-[data-slot="dialog-content"],
-[data-slot="sheet-content"] {
-  background: rgba(255, 255, 255, 0.80) !important;
-  backdrop-filter: blur(18px) saturate(170%);
-  -webkit-backdrop-filter: blur(18px) saturate(170%);
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.90),
-    0 24px 64px rgba(0, 0, 0, 0.10),
-    0 8px 24px rgba(0, 0, 0, 0.06),
-    0 0 0 0.5px rgba(0, 0, 0, 0.05);
-}
-
-/* Dialog overlay: subtle navy tint instead of dark block */
-[data-slot="dialog-overlay"] {
-  background: rgba(30, 27, 75, 0.12) !important;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-
-/* Base: Sticky header (12px) */
-header.sticky {
-  background: rgba(255, 255, 255, 0.60) !important;
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.45) !important;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.70), 0 2px 8px rgba(0, 0, 0, 0.03);
-}
-
-/* Base: Sidebar (12px) */
-[data-sidebar="sidebar"] {
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border-right: 2px solid rgba(255, 255, 255, 0.40) !important;
-}
-
-/* Level 4: Tooltip (20px — darkest, most crisp) */
-[data-slot="tooltip-content"] {
-  background: rgba(30, 27, 75, 0.88) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-
-/* ── Legacy opacity normalizers ──────────────────────────────────── */
+/* ── Legacy opacity normalizers (map old translucent utilities to solid) ── */
 .bg-card\/30,
 .bg-card\/20,
 .bg-card\/40,
@@ -251,34 +201,29 @@ header.sticky {
   background-color: var(--secondary);
 }
 
-/* ── Tabular numbers ─────────────────────────────────────────────── */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Glass card helper ───────────────────────────────────────────── */
+/* glass-card helper kept as a flat premium surface for any legacy usage */
 .glass-card {
-  background: rgba(255, 255, 255, 0.62);
-  border: 2px solid rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 2px 12px rgba(0, 0, 0, 0.05);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 /* ── Scrollbar ───────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(245, 245, 244, 0.60);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(214, 211, 209, 0.80);
-  border-radius: 3px;
+  background: #D9D9D6;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A29E;
+  background: #BFBFBB;
 }

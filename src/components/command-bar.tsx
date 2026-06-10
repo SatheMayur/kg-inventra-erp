@@ -12,7 +12,7 @@ interface CommandResult {
 }
 
 /**
- * Global natural-language "Ask Inventra" bar. Open with ⌘K / Ctrl+K.
+ * Global natural-language "Ask KG_inventra" bar. Open with ⌘K / Ctrl+K.
  * Read-only: queries stock / low-stock / pending requests via /api/command.
  */
 export function CommandBar() {
@@ -62,10 +62,10 @@ export function CommandBar() {
       }}
     >
       <DialogContent className="sm:max-w-lg">
-        <DialogTitle className="sr-only">Ask Inventra</DialogTitle>
+        <DialogTitle className="sr-only">Ask KG_inventra</DialogTitle>
         <div className="flex items-center gap-2 text-primary">
           <Sparkles className="size-4" />
-          <span className="text-xs font-bold uppercase tracking-widest">Ask Inventra</span>
+          <span className="text-xs font-bold uppercase tracking-widest">Ask KG_inventra</span>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/50" />

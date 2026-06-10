@@ -22,9 +22,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Inventra — Operational Intelligence",
+  title: "KG_inventra — Inventory ERP",
   description: "Operational intelligence platform for inventory and procurement.",
-  keywords: ["Inventra", "Inventory", "Operations", "Procurement", "Stock"],
+  keywords: ["KG_inventra", "Inventory", "ERP", "Procurement", "Stock"],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
