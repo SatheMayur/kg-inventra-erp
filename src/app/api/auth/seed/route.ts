@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       } else {
         await tx.seedFlag.create({ data: { seeded: true } });
       }
-    });
+    }, { timeout: 120_000, maxWait: 20_000 }); // remote Postgres (Neon) latency makes the default 5s timeout too tight
 
     return NextResponse.json({ message: 'Database seeded successfully', seeded: true });
   } catch (error: unknown) {
