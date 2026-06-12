@@ -40,6 +40,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ItemThumb } from '@/components/inventory/item-thumb'
 import { api, StockTransferResponse, ItemResponse, PetpoojaPOResponse } from '@/lib/api'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -590,6 +591,12 @@ export default function StockTransferView() {
               <div className="space-y-2">
                 {createForm.items.map((row, idx) => (
                   <div key={idx} className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
+                    {/* Photo of the item being moved — visual confirmation */}
+                    <ItemThumb
+                      photoUrl={items.find((i) => i.id === row.itemId)?.photoUrl}
+                      name={row.itemName || 'No item selected'}
+                      size={36}
+                    />
                     <div className="flex-1">
                       <Select
                         value={row.itemId}
@@ -608,7 +615,15 @@ export default function StockTransferView() {
                         <SelectContent>
                           {items.map((i) => (
                             <SelectItem key={i.id} value={i.id}>
-                              {i.name} ({i.stock} {i.unit})
+                              <span className="flex items-center gap-2">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                {i.photoUrl ? (
+                                  <img src={i.photoUrl} alt="" loading="lazy" className="size-5 rounded object-cover" />
+                                ) : (
+                                  <span className="size-5 rounded bg-muted/40 inline-block" />
+                                )}
+                                {i.name} ({i.stock} {i.unit})
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>

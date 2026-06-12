@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { api, ItemResponse, UserResponse } from '@/lib/api'
+import { ItemThumb } from '@/components/inventory/item-thumb'
 import { toast } from 'sonner'
 
 interface NewRequestDialogProps {
@@ -216,9 +217,12 @@ export function NewRequestDialog({
                             ${isUnavailable ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                           `}
                         >
-                          <div className="min-w-0">
-                            <p className="font-medium truncate">{item.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{item.category}</p>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ItemThumb photoUrl={item.photoUrl} name={item.name} size={32} />
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{item.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{item.category}</p>
+                            </div>
                           </div>
                           <span className={`text-[10px] font-mono ml-3 shrink-0 ${isUnavailable ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {isUnavailable ? 'Out of stock' : `${avail} ${item.unit}`}
@@ -229,9 +233,12 @@ export function NewRequestDialog({
                   )}
                 </div>
                 {formItemId && selectedFormItem && (
-                  <p className="text-[10px] text-primary font-medium">
-                    Selected: {selectedFormItem.name}
-                  </p>
+                  <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 p-1.5">
+                    <ItemThumb photoUrl={selectedFormItem.photoUrl} name={selectedFormItem.name} size={40} />
+                    <p className="text-[11px] text-primary font-medium">
+                      Selected: {selectedFormItem.name}
+                    </p>
+                  </div>
                 )}
               </div>
             )}
