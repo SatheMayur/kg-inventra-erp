@@ -31,6 +31,7 @@ import { QRCodeDialog } from './QRCodeDialog'
 import { ItemVariantsDialog } from './ItemVariantsDialog'
 import { ItemThumb } from './item-thumb'
 import { ItemImagesDialog } from './ItemImagesDialog'
+import { ItemDetailDialog } from './ItemDetailDialog'
 
 interface InventoryTableProps {
   items: ItemResponse[]
@@ -139,6 +140,9 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
 
   // Photos dialog
   const [imagesItem, setImagesItem] = useState<ItemResponse | null>(null)
+
+  // Detail dialog (click on item name)
+  const [detailItem, setDetailItem] = useState<ItemResponse | null>(null)
 
   function openEdit(item: ItemResponse) {
     setEditItem(item)
@@ -276,10 +280,14 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
                     <ItemThumb photoUrl={item.photoUrl} name={item.name} size={40} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-0.5">
+                    <button
+                      type="button"
+                      className="flex flex-col gap-0.5 text-left hover:underline underline-offset-2 cursor-pointer"
+                      onClick={() => setDetailItem(item)}
+                    >
                       <span className="font-semibold text-sm text-foreground leading-tight">{item.name}</span>
                       <span className="text-[10px] text-muted-foreground font-mono">{item.id.slice(0, 8).toUpperCase()}</span>
-                    </div>
+                    </button>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="text-[10px] font-medium bg-muted/30 text-muted-foreground border-0">
@@ -312,7 +320,7 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground"
                           onClick={(e) => { e.stopPropagation(); openRestock(item) }}
                         >
                           <RefreshCw className="size-3" /> Restock
@@ -322,7 +330,7 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="size-7 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="size-7 text-muted-foreground hover:text-foreground"
                             >
                               <MoreHorizontal className="size-3.5" />
                             </Button>
@@ -487,6 +495,8 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
         open={!!variantsItem}
         onOpenChange={(o) => { if (!o) setVariantsItem(null) }}
       />
+
+      <ItemDetailDialog item={detailItem} onOpenChange={(o) => { if (!o) setDetailItem(null) }} />
 
       {imagesItem && (
         <ItemImagesDialog

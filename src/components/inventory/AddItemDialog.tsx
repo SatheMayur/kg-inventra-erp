@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Package, Check, Loader2, Camera, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { toast } from 'sonner'
 
@@ -30,6 +37,15 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
   const [minStock, setMinStock] = useState('5')
   const [photos, setPhotos] = useState<File[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [categories, setCategories] = useState<string[]>([])
+  const [newCategory, setNewCategory] = useState(false)
+
+  // Existing categories as a dropdown — typing them by hand creates
+  // duplicates like "Tools"/"tools"
+  useEffect(() => {
+    if (!open) return
+    api.items.categories().then(setCategories).catch(() => {})
+  }, [open])
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
@@ -120,12 +136,40 @@ export function AddItemDialog({ open, onOpenChange, onSuccess }: AddItemDialogPr
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Category</Label>
-              <Input
-                placeholder="e.g. Laptops"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="bg-muted/20 border-border/50"
-              />
+              {newCategory || categories.length === 0 ? (
+                <div className="flex gap-1.5">
+                  <Input
+                    placeholder="New category name"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="bg-muted/20 border-border/50"
+                    autoFocus={newCategory}
+                  />
+                  {categories.length > 0 && (
+                    <Button type="button" size="sm" variant="ghost" className="px-2 text-xs" onClick={() => { setNewCategory(false); setCategory('') }}>
+                      <X className="size-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Select
+                  value={category}
+                  onValueChange={(v) => {
+                    if (v === '__new__') { setNewCategory(true); setCategory('') }
+                    else setCategory(v)
+                  }}
+                >
+                  <SelectTrigger className="bg-muted/20 border-border/50">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                    <SelectItem value="__new__">➕ New category…</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Unit</Label>
