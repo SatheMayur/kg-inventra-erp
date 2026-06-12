@@ -12,7 +12,8 @@ const PUBLIC_ROUTES = new Set([
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (!pathname.startsWith('/api') || PUBLIC_ROUTES.has(pathname)) {
+  // Uploaded images load via <img> tags which send no Authorization header
+  if (!pathname.startsWith('/api') || PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/api/uploads/')) {
     return NextResponse.next();
   }
 

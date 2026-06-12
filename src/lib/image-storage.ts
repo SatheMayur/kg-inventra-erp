@@ -19,7 +19,8 @@ export async function saveImage(buffer: Buffer, filename: string, contentType: s
   }
   await fs.mkdir(LOCAL_DIR, { recursive: true });
   await fs.writeFile(path.join(LOCAL_DIR, filename), buffer);
-  return `/uploads/items/${filename}`;
+  // Served via the API route — Next.js won't serve public/ files created after build
+  return `/api/uploads/items/${filename}`;
 }
 
 /** Delete by the URL previously returned from saveImage. Missing files are ignored. */
@@ -30,6 +31,7 @@ export async function deleteImage(url: string): Promise<void> {
     await del(url).catch(() => {});
     return;
   }
-  const filePath = path.join(process.cwd(), 'public', url);
+  const rel = url.replace(/^\/api\/uploads\//, 'uploads/').replace(/^\/uploads\//, 'uploads/');
+  const filePath = path.join(process.cwd(), 'public', rel);
   await fs.unlink(filePath).catch(() => {});
 }
