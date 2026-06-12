@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -44,6 +44,7 @@ model Notification {
 model Item {
   id           String    @id @default(cuid())
   name         String
+  barcode      String?   @unique
   category     String
   unit         String    @default("pcs")
   stock        Int       @default(0)
