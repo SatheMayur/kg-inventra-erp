@@ -66,7 +66,8 @@ model Item {
   checkouts     ItemCheckout[]
   pickListItems PickListItem[]
   maintenanceSchedules MaintenanceSchedule[]
-  photoUrl      String?
+  images        ItemImage[]
+  photoUrl      String?   // legacy single photo — kept in sync with primary image thumbnail
   folder        String?
   customFields  Json?
 
@@ -74,6 +75,22 @@ model Item {
   // @@unique([name, category, deletedAt]) won't prevent duplicates where deletedAt IS NULL.
   // The API layer handles uniqueness checks for non-deleted items manually.
   // This index helps with lookups by name+category among active items.
+}
+
+model ItemImage {
+  id            String   @id @default(cuid())
+  itemId        String
+  imagePath     String   // full-resolution original (local path or blob URL)
+  thumbnailPath String   // 150x150 thumbnail
+  isPrimary     Boolean  @default(false)
+  labelType     String?  // liquids: "front" | "hazard" | "batch"; null for others
+  sortOrder     Int      @default(0)
+  uploadedAt    DateTime @default(now())
+
+  item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, isPrimary])
+  @@index([itemId, sortOrder])
 }
 
 model Supplier {

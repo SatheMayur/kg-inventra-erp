@@ -86,6 +86,7 @@ export interface ItemResponse {
   minStock: number
   reservedQty: number
   version: number
+  photoUrl: string | null
   deletedAt: string | null
   createdAt: string
   updatedAt: string

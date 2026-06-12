@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import {
   MoreHorizontal, Edit, RefreshCw, Trash2, BoxesIcon,
   AlertTriangle, CheckCircle2, Loader2, Check, QrCode,
-  ChevronUp, ChevronDown, ChevronsUpDown, Layers,
+  ChevronUp, ChevronDown, ChevronsUpDown, Layers, Camera,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,8 @@ import { toast } from 'sonner'
 import { useAppStore } from '@/lib/store'
 import { QRCodeDialog } from './QRCodeDialog'
 import { ItemVariantsDialog } from './ItemVariantsDialog'
+import { ItemThumb } from './item-thumb'
+import { ItemImagesDialog } from './ItemImagesDialog'
 
 interface InventoryTableProps {
   items: ItemResponse[]
@@ -135,6 +137,9 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
   // Variants dialog
   const [variantsItem, setVariantsItem] = useState<ItemResponse | null>(null)
 
+  // Photos dialog
+  const [imagesItem, setImagesItem] = useState<ItemResponse | null>(null)
+
   function openEdit(item: ItemResponse) {
     setEditItem(item)
     setEditName(item.name)
@@ -219,6 +224,7 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
         <Table className="enterprise-table">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[52px]">Photo</TableHead>
               <TableHead className="w-[280px]">
                 <SortButton field="name" current={sortField} dir={sortDir} onSort={handleSort}>
                   Item Name
@@ -246,6 +252,7 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="size-10 rounded-md" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-28" /></TableCell>
@@ -255,7 +262,7 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
               ))
             ) : sortedItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 5 : 4} className="h-56 text-center">
+                <TableCell colSpan={isAdmin ? 6 : 5} className="h-56 text-center">
                   <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
                     <BoxesIcon className="size-8 opacity-20" />
                     <p className="text-sm">No items match your criteria</p>
@@ -265,6 +272,9 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
             ) : (
               sortedItems.map((item) => (
                 <TableRow key={item.id} className="group">
+                  <TableCell>
+                    <ItemThumb photoUrl={item.photoUrl} name={item.name} size={40} />
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-0.5">
                       <span className="font-semibold text-sm text-foreground leading-tight">{item.name}</span>
@@ -329,6 +339,9 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 text-xs" onClick={() => setVariantsItem(item)}>
                               <Layers className="size-3.5 text-violet-500" /> Manage variants
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2 text-xs" onClick={() => setImagesItem(item)}>
+                              <Camera className="size-3.5 text-sky-500" /> Photos
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -399,6 +412,16 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
               Add stock for <strong>{restockItem?.name}</strong> — current: {restockItem?.stock} {restockItem?.unit}
             </DialogDescription>
           </DialogHeader>
+          {/* Visual confirmation — prevents adjusting the wrong item */}
+          {restockItem && (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-2">
+              <ItemThumb photoUrl={restockItem.photoUrl} name={restockItem.name} size={56} />
+              <div className="text-xs text-muted-foreground">
+                <p className="font-semibold text-foreground">{restockItem.name}</p>
+                <p>{restockItem.category} · {restockItem.stock} {restockItem.unit} in stock</p>
+              </div>
+            </div>
+          )}
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label className="text-[11px] uppercase font-semibold text-muted-foreground tracking-[0.06em]">Quantity to add</Label>
@@ -464,6 +487,17 @@ export function InventoryTable({ items, loading, onRefresh }: InventoryTableProp
         open={!!variantsItem}
         onOpenChange={(o) => { if (!o) setVariantsItem(null) }}
       />
+
+      {imagesItem && (
+        <ItemImagesDialog
+          itemId={imagesItem.id}
+          itemName={imagesItem.name}
+          isLiquid={imagesItem.category.toLowerCase().includes('liquid')}
+          open={!!imagesItem}
+          onOpenChange={(o) => { if (!o) setImagesItem(null) }}
+          onPrimaryChange={() => onRefresh?.()}
+        />
+      )}
     </>
   )
 }
