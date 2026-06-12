@@ -18,7 +18,9 @@ import {
   IndianRupee,
   MoreVertical,
   ArrowDownToLine,
-  Loader2
+  Loader2,
+  Trash2,
+  ImageOff
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -59,7 +61,7 @@ export default function ProcurementView() {
   // New PO Dialog state
   const [showNewPODialog, setShowNewPODialog] = useState(false)
   const [selectedSupplier, setSelectedSupplier] = useState('')
-  const [poItems, setPOItems] = useState<Array<{ itemId: string, qty: number, unitPrice: number }>>([])
+  const [poItems, setPOItems] = useState<Array<{ itemId: string, qty: number, unitPrice: number }>>([{ itemId: '', qty: 1, unitPrice: 0 }])
   const [poNotes, setPONotes] = useState('')
   const [savingPO, setSavingPO] = useState(false)
   
@@ -108,6 +110,12 @@ export default function ProcurementView() {
     fetchData()
   }, [fetchData])
 
+  const resetPOForm = () => {
+    setSelectedSupplier('')
+    setPOItems([{ itemId: '', qty: 1, unitPrice: 0 }])
+    setPONotes('')
+  }
+
   const handleCreatePO = async () => {
     if (!selectedSupplier) {
       toast.error('Please select a supplier')
@@ -133,8 +141,7 @@ export default function ProcurementView() {
       toast.success('Purchase order sent successfully')
       setShowNewPODialog(false)
       fetchData()
-      setPOItems([{ itemId: '', qty: 1, unitPrice: 0 }])
-      setPONotes('')
+      resetPOForm()
     } catch (err) {
       toast.error('Failed to send purchase order')
     } finally {
@@ -231,6 +238,9 @@ export default function ProcurementView() {
         return <Badge variant="outline">{status}</Badge>
     }
   }
+
+  const validPOItems = poItems.filter(i => i.itemId && i.qty > 0)
+  const canSubmitPO = !!selectedSupplier && validPOItems.length > 0
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -503,7 +513,10 @@ export default function ProcurementView() {
       {/* --- Dialogs --- */}
 
       {/* Raise PO Dialog */}
-      <Dialog open={showNewPODialog} onOpenChange={setShowNewPODialog}>
+      <Dialog open={showNewPODialog} onOpenChange={(open) => {
+        setShowNewPODialog(open)
+        if (!open) resetPOForm()
+      }}>
         <DialogContent className="sm:max-w-2xl border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -525,6 +538,21 @@ export default function ProcurementView() {
                   ))}
                 </SelectContent>
               </Select>
+              {suppliers.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No suppliers registered yet.{' '}
+                  <Button
+                    variant="link"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => {
+                      setShowNewPODialog(false)
+                      setShowNewSupplierDialog(true)
+                    }}
+                  >
+                    Add a supplier first
+                  </Button>
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -545,16 +573,26 @@ export default function ProcurementView() {
                   <div key={idx} className="flex items-end gap-3 animate-in slide-in-from-left-2 duration-300">
                     <div className="flex-1 space-y-1.5">
                       <Select value={pi.itemId} onValueChange={(v) => {
-                        const next = [...poItems];
-                        next[idx].itemId = v;
-                        setPOItems(next);
+                        setPOItems(poItems.map((row, i) => i === idx ? { ...row, itemId: v } : row));
                       }}>
                         <SelectTrigger className="bg-background border-border h-10">
                           <SelectValue placeholder="Item..." />
                         </SelectTrigger>
                         <SelectContent>
                           {items.map(i => (
-                            <SelectItem key={i.id} value={i.id}>{i.name} ({i.stock} in stock)</SelectItem>
+                            <SelectItem key={i.id} value={i.id}>
+                              <span className="flex items-center gap-2">
+                                {i.photoUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={i.photoUrl} alt="" loading="lazy" className="size-6 rounded object-cover border border-border shrink-0" />
+                                ) : (
+                                  <span className="flex size-6 items-center justify-center rounded bg-muted/40 shrink-0">
+                                    <ImageOff className="size-3 text-muted-foreground/40" />
+                                  </span>
+                                )}
+                                {i.name} ({i.stock} in stock)
+                              </span>
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -565,9 +603,8 @@ export default function ProcurementView() {
                         placeholder="Qty" 
                         value={pi.qty} 
                         onChange={(e) => {
-                          const next = [...poItems];
-                          next[idx].qty = parseInt(e.target.value) || 0;
-                          setPOItems(next);
+                          const qty = parseInt(e.target.value) || 0;
+                          setPOItems(poItems.map((row, i) => i === idx ? { ...row, qty } : row));
                         }}
                         className="bg-background border-border h-10" 
                       />
@@ -578,9 +615,8 @@ export default function ProcurementView() {
                         placeholder="Price" 
                         value={pi.unitPrice} 
                         onChange={(e) => {
-                          const next = [...poItems];
-                          next[idx].unitPrice = parseFloat(e.target.value) || 0;
-                          setPOItems(next);
+                          const unitPrice = parseFloat(e.target.value) || 0;
+                          setPOItems(poItems.map((row, i) => i === idx ? { ...row, unitPrice } : row));
                         }}
                         className="bg-background border-border h-10" 
                       />
@@ -591,7 +627,7 @@ export default function ProcurementView() {
                       className="size-10 text-muted-foreground hover:text-destructive"
                       onClick={() => setPOItems(poItems.filter((_, i) => i !== idx))}
                     >
-                      <MoreVertical className="size-4" />
+                      <Trash2 className="size-4" />
                     </Button>
                   </div>
                 ))}
@@ -617,11 +653,16 @@ export default function ProcurementView() {
           </div>
 
           <DialogFooter className="pt-4 border-t border-border/10">
+            {!canSubmitPO && (
+              <span className="mr-auto self-center text-xs text-muted-foreground">
+                {!selectedSupplier ? 'Select a supplier to continue' : 'Add at least one item with a quantity'}
+              </span>
+            )}
             <Button variant="ghost" onClick={() => setShowNewPODialog(false)} disabled={savingPO}>Cancel</Button>
-            <Button 
+            <Button
               className="rounded-xl px-8 shadow-lg shadow-primary/20 gap-2"
               onClick={handleCreatePO}
-              disabled={savingPO || poItems.length === 0}
+              disabled={savingPO || !canSubmitPO}
             >
               {savingPO ? <Loader2 className="size-4 animate-spin" /> : <ShoppingCart className="size-4" />}
               Send Purchase Order
