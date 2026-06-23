@@ -61,6 +61,11 @@ export async function PATCH(
               data: { reservedQty: { decrement: line.availableQty || 0 }, version: { increment: 1 } },
             });
           }
+          // Off-catalog proposal never promoted → soft-delete the orphan proposed item.
+          await tx.item.updateMany({
+            where: { id: line.itemId, active: false, sourceChannel: 'REQUISITION', stock: 0 },
+            data: { deletedAt: new Date() },
+          });
           continue;
         }
 
@@ -98,6 +103,12 @@ export async function PATCH(
             data: { reservedQty: { decrement: releaseQty }, version: { increment: 1 } },
           });
         }
+
+        // Promote a proposed (off-catalog) item into the real catalog now it's vetted.
+        await tx.item.updateMany({
+          where: { id: line.itemId, active: false, sourceChannel: 'REQUISITION' },
+          data: { active: true },
+        });
       }
 
       if (approvedLineCount === 0) {
