@@ -81,9 +81,13 @@ export async function POST(request: NextRequest) {
       throw new ApiError(403, 'You can only create requests for yourself', 'FORBIDDEN');
     }
 
-    // Aggregate requested qty per item so duplicate lines don't over-reserve stock.
+    // Aggregate requested qty per catalog item so duplicate lines don't over-reserve
+    // stock. Custom (off-catalog) lines have no itemId yet and are materialized below.
     const qtyByItem = new Map<string, number>();
-    for (const l of lines) qtyByItem.set(l.itemId, (qtyByItem.get(l.itemId) ?? 0) + l.qty);
+    for (const l of lines) {
+      if (!l.itemId) continue;
+      qtyByItem.set(l.itemId, (qtyByItem.get(l.itemId) ?? 0) + l.qty);
+    }
 
     const result = await db.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
@@ -168,6 +172,39 @@ export async function POST(request: NextRequest) {
             status: body.status === 'DRAFT' ? 'DRAFT' : statusStr,
           });
         }
+      }
+
+      // Off-catalog (custom) lines: materialize a proposed Item (active:false, hidden
+      // from catalog until an admin promotes it on approval) and add a PURCHASE_REQUIRED
+      // line. Stock is 0, so nothing is reserved.
+      for (const l of lines) {
+        if (!l.customItemName) continue;
+        const proposed = await tx.item.create({
+          data: {
+            name: l.customItemName,
+            unit: l.unit || 'pcs',
+            category: 'Custom Request',
+            stock: 0,
+            reservedQty: 0,
+            reorderQty: 0,
+            price: 0,
+            active: false,
+            sourceChannel: 'REQUISITION',
+            createdBy: userId,
+          },
+        });
+        hasDeficit = true;
+        lineData.push({
+          itemId: proposed.id,
+          itemName: proposed.name,
+          requestedQty: l.qty,
+          availableQtySnapshot: 0,
+          availableQty: 0,
+          pendingPurchaseQty: l.qty,
+          fulfillmentStatus: 'PURCHASE_REQUIRED',
+          unit: proposed.unit,
+          status: body.status === 'DRAFT' ? 'DRAFT' : 'Pending',
+        });
       }
 
       const status = body.status === 'DRAFT' ? 'DRAFT' : (hasDeficit ? 'UNDER_REVIEW' : 'SUBMITTED');
