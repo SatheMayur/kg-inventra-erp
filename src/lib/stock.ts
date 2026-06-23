@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { ApiError } from './api-utils';
+import { resolveSubType, type MovementSubType } from './movement-subtype';
 
 type Tx = Prisma.TransactionClient;
 
@@ -23,6 +24,11 @@ export async function mutateStock(
     expectedVersion?: number;
     /** Override the ledger type; defaults from the sign of delta. */
     type?: 'IN' | 'OUT';
+    /** Ledger movement classification; defaults to ADJUST. */
+    subType?: MovementSubType;
+    /** Optional reference classification for reporting. */
+    referenceType?: string;
+    remarks?: string;
   }
 ) {
   if (!Number.isFinite(opts.delta) || opts.delta === 0) {
@@ -50,13 +56,41 @@ export async function mutateStock(
   await tx.transaction.create({
     data: {
       type: opts.type ?? (opts.delta > 0 ? 'IN' : 'OUT'),
+      subType: resolveSubType(opts.subType),
       itemId: opts.itemId,
       itemName: item.name,
       qty: Math.abs(opts.delta),
+      balanceAfter: after.stock,
+      referenceType: opts.referenceType ?? null,
       reference: opts.reference,
       userId: opts.userId ?? null,
+      remarks: opts.remarks ?? null,
     },
   });
+
+  // Low stock check: if stock drops below minStock and delta was negative
+  if (opts.delta < 0 && after.stock <= item.minStock) {
+    try {
+      const admins = await tx.user.findMany({
+        where: { role: 'admin', active: true, phone: { not: null } }
+      });
+      for (const admin of admins) {
+        const adminPhone = admin.phone!.replace(/\D/g, '');
+        if (adminPhone) {
+          await tx.whatsAppMessage.create({
+            data: {
+              phone: `${adminPhone}@s.whatsapp.net`,
+              message: `⚠️ Low Stock Alert: "${item.name}" has dropped below its reorder point of ${item.minStock} ${item.unit}. Current physical stock: ${after.stock} ${item.unit}.`,
+              direction: 'OUTBOUND',
+              status: 'PENDING'
+            }
+          });
+        }
+      }
+    } catch (alertErr) {
+      console.error('⚠️ Failed to queue low stock alert:', alertErr);
+    }
+  }
 
   return { before: item, after };
 }
@@ -71,6 +105,18 @@ export async function releaseReservation(tx: Tx, itemId: string, qty: number) {
   await tx.item.update({
     where: { id: itemId },
     data: { reservedQty: { decrement: qty } },
+  });
+}
+
+/**
+ * Atomically place a reservation hold on an item. Symmetric to releaseReservation.
+ * Used when GRN-received stock is re-earmarked to the originating requisition line.
+ */
+export async function reserveStock(tx: Tx, itemId: string, qty: number) {
+  if (!Number.isFinite(qty) || qty <= 0) return;
+  await tx.item.update({
+    where: { id: itemId },
+    data: { reservedQty: { increment: qty } },
   });
 }
 
@@ -92,7 +138,6 @@ export async function nextSequentialNumber(
   model: Numbered,
   prefix: string
 ): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const count: number = await (tx as any)[model].count();
   return `${prefix}-${String(count + 1).padStart(3, '0')}`;
 }
