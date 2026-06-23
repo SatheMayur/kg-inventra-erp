@@ -25,6 +25,7 @@ import {
   ClipboardCheck,
   Bell,
   Plug2,
+  MessageCircle,
 } from 'lucide-react'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { Button } from '@/components/ui/button'
@@ -85,6 +86,7 @@ import PickListView from '@/components/views/pick-list-view'
 import AlertsView from '@/components/views/alerts-view'
 import IntegrationsView from '@/components/views/integrations-view'
 import AssetsView from '@/components/views/assets-view'
+import WhatsAppInboxView from '@/components/views/whatsapp-inbox-view'
 import { BarcodeListener } from '@/components/barcode-listener'
 import { CommandBar } from '@/components/command-bar'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -99,135 +101,197 @@ interface NavItem {
 
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Workspace', ids: ['dashboard', 'inventory', 'requests', 'import', 'tags', 'custom-fields'] },
-  { label: 'Operations', ids: ['procurement', 'logistics', 'transfers', 'issuance', 'checkout', 'pick-lists', 'alerts'] },
+  { label: 'Store Management', ids: ['store-item-master', 'store-requisition-master', 'purchase-order-process', 'purchase-invoice-entry', 'transfer-to-department', 'stock-tracking'] },
+  { label: 'Operations', ids: ['procurement', 'logistics', 'transfers', 'issuance', 'checkout', 'pick-lists', 'alerts', 'whatsapp-inbox'] },
   { label: 'Analytics', ids: ['reporting', 'transactions'] },
   { label: 'System', ids: ['audit', 'users', 'settings', 'integrations'] },
 ]
 
+const ADMIN_CANONICAL_VIEW_ALIASES: Record<string, string> = {
+  inventory: 'store-item-master',
+  requests: 'store-requisition-master',
+  procurement: 'purchase-order-process',
+  transfers: 'transfer-to-department',
+  transactions: 'stock-tracking',
+}
+
+const ADMIN_DUPLICATE_VIEW_IDS = new Set(Object.keys(ADMIN_CANONICAL_VIEW_ALIASES))
+
 const VIEW_CONFIG: Record<string, { label: string; roles: string[]; icon: React.ReactNode; subtitle: string; rootOnly?: boolean }> = {
   dashboard: { 
     label: 'Dashboard', 
-    roles: ['admin', 'employee'], 
+    roles: ['admin', 'employee', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_USER', 'DEPT_HEAD', 'PURCHASE_USER', 'ACCOUNTS_USER', 'MANAGEMENT'], 
     icon: <LayoutDashboard className="size-4" />,
     subtitle: 'Overview of your inventory'
   },
   inventory: { 
     label: 'Inventory', 
-    roles: ['admin'], 
+    roles: ['admin', 'STORE_ADMIN'], 
     icon: <Package className="size-4" />,
     subtitle: 'Manage your stock items'
   },
   requests: { 
     label: 'Requests', 
-    roles: ['admin', 'employee'], 
+    roles: ['admin', 'employee', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_USER', 'DEPT_HEAD'], 
     icon: <ClipboardList className="size-4" />,
     subtitle: 'Track and manage requests'
   },
   import: {
     label: 'Import',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN'],
     icon: <FileSpreadsheet className="size-4" />,
     subtitle: 'Bulk import items from spreadsheet'
   },
   assets: {
     label: 'IT Assets',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN'],
     icon: <Cpu className="size-4" />,
     subtitle: 'Serialized equipment & assignments'
   },
   tags: {
     label: 'Tags',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN'],
     icon: <Tag className="size-4" />,
     subtitle: 'Manage item tags and folders'
   },
   'custom-fields': {
     label: 'Custom Fields',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN'],
     icon: <Sliders className="size-4" />,
     subtitle: 'Define custom item attributes'
   },
   procurement: {
     label: 'Procurement',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN', 'PURCHASE_USER', 'ACCOUNTS_USER'],
     icon: <ShoppingCart className="size-4" />,
     subtitle: 'Manage POs, Invoices and Suppliers'
   },
   logistics: {
     label: 'Logistics',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR', 'PURCHASE_USER'],
     icon: <ArrowRightLeft className="size-4" />,
     subtitle: 'Challans and Gate Passes'
   },
   transfers: {
     label: 'Stock Transfers',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'],
     icon: <Truck className="size-4" />,
-    subtitle: 'Transfer memos and Petpooja reconciliation',
+    subtitle: 'Transfer memos and location movement',
   },
   issuance: {
     label: 'Issuance',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'],
     icon: <HandHeart className="size-4" />,
     subtitle: 'Process pending issuances'
   },
   checkout: {
     label: 'Check-out',
-    roles: ['admin', 'employee'],
+    roles: ['admin', 'employee', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_USER', 'DEPT_HEAD'],
     icon: <PackageCheck className="size-4" />,
     subtitle: 'Track item custody'
   },
   'pick-lists': {
     label: 'Pick Lists',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'],
     icon: <ClipboardCheck className="size-4" />,
     subtitle: 'Gather items for jobs'
   },
   alerts: {
     label: 'Alerts',
-    roles: ['admin', 'employee'],
+    roles: ['admin', 'employee', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_USER', 'DEPT_HEAD', 'PURCHASE_USER', 'ACCOUNTS_USER'],
     icon: <Bell className="size-4" />,
     subtitle: 'Low stock and maintenance alerts'
   },
   reporting: { 
     label: 'Reporting', 
-    roles: ['admin'], 
+    roles: ['admin', 'STORE_ADMIN', 'PURCHASE_USER', 'ACCOUNTS_USER', 'MANAGEMENT'], 
     icon: <BarChart3 className="size-4" />,
     subtitle: 'Analytics and reports'
   },
   transactions: { 
     label: 'Transactions', 
-    roles: ['admin', 'employee'], 
+    roles: ['admin', 'employee', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_USER', 'DEPT_HEAD', 'PURCHASE_USER', 'ACCOUNTS_USER', 'MANAGEMENT'], 
     icon: <ArrowRightLeft className="size-4" />,
     subtitle: 'Transaction history'
   },
   audit: { 
     label: 'Security Logs', 
-    roles: ['admin'], 
+    roles: ['admin', 'STORE_ADMIN', 'MANAGEMENT'], 
     rootOnly: true,
     icon: <ShieldAlert className="size-4" />,
     subtitle: 'System audit and activity'
   },
   users: { 
     label: 'User Management', 
-    roles: ['admin'], 
+    roles: ['admin', 'STORE_ADMIN'], 
     rootOnly: true,
     icon: <Users className="size-4" />,
     subtitle: 'Manage users and roles'
   },
   settings: {
     label: 'Settings',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN'],
     rootOnly: true,
     icon: <Settings className="size-4" />,
     subtitle: 'System configuration'
   },
   integrations: {
     label: 'Integrations',
-    roles: ['admin'],
+    roles: ['admin', 'STORE_ADMIN'],
     icon: <Plug2 className="size-4" />,
     subtitle: 'Slack, Teams, Webhooks and more'
   },
+  'whatsapp-inbox': {
+    label: 'WhatsApp Inbox',
+    roles: ['admin', 'STORE_ADMIN'],
+    icon: <MessageCircle className="size-4" />,
+    subtitle: 'Conversational requisitions and support'
+  },
+  'store-item-master': {
+    label: 'Store Item Master',
+    roles: ['admin', 'STORE_ADMIN'],
+    icon: <Package className="size-4" />,
+    subtitle: 'Central inventory master and item setup',
+  },
+  'store-requisition-master': {
+    label: 'Store Requisition Master',
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_HEAD'],
+    icon: <ClipboardList className="size-4" />,
+    subtitle: 'Department requests and approvals',
+  },
+  'purchase-order-process': {
+    label: 'Purchase Order Process',
+    roles: ['admin', 'STORE_ADMIN', 'PURCHASE_USER'],
+    icon: <ShoppingCart className="size-4" />,
+    subtitle: 'PO creation, approval, and receipt',
+  },
+  'purchase-invoice-entry': {
+    label: 'Purchase Invoice Entry',
+    roles: ['admin', 'STORE_ADMIN', 'ACCOUNTS_USER'],
+    icon: <FileSpreadsheet className="size-4" />,
+    subtitle: 'Invoice capture and three-way matching',
+  },
+  'transfer-to-department': {
+    label: 'Transfer to Department',
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'],
+    icon: <ArrowRightLeft className="size-4" />,
+    subtitle: 'Department issue and transfer movement',
+  },
+  'stock-tracking': {
+    label: 'Stock Tracking',
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR', 'DEPT_USER', 'DEPT_HEAD', 'PURCHASE_USER', 'ACCOUNTS_USER', 'MANAGEMENT'],
+    icon: <PackageCheck className="size-4" />,
+    subtitle: 'Ledger and balance tracking',
+  },
+}
+
+function resolveViewForUser(view: string, user: { role?: string; empId?: string } | null | undefined) {
+  const isAdmin = user?.role === 'admin'
+  const isRoot = user?.empId === 'software'
+  const canonicalView = isAdmin ? (ADMIN_CANONICAL_VIEW_ALIASES[view] ?? view) : view
+  const config = VIEW_CONFIG[canonicalView] || VIEW_CONFIG.dashboard
+  const hasAccess = config.roles.includes(user?.role || '') && (!config.rootOnly || isRoot)
+  return hasAccess ? canonicalView : 'dashboard'
 }
 
 function ViewRenderer({ view, user, onPitchModeChange }: { view: string; user: any; onPitchModeChange: (val: boolean) => void }) {
@@ -248,7 +312,7 @@ function ViewRenderer({ view, user, onPitchModeChange }: { view: string; user: a
               <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/50 bg-clip-text text-transparent">Dashboard</h2>
               <p className="text-muted-foreground">
                 {user?.role === 'admin' 
-                  ? 'Live operations — stock health, procurement activity, and stockout risk.'
+                  ? 'Live operations - stock health, procurement activity, and stockout risk.'
                   : 'Overview of your active requests and inventory assets.'}
               </p>
             </div>
@@ -305,8 +369,22 @@ function ViewRenderer({ view, user, onPitchModeChange }: { view: string; user: a
       return <PickListView />
     case 'alerts':
       return <AlertsView />
+    case 'whatsapp-inbox':
+      return <WhatsAppInboxView />
     case 'integrations':
       return <IntegrationsView />
+    case 'store-item-master':
+      return <InventoryView title="Store Item Master" />
+    case 'store-requisition-master':
+      return <RequestsView title="Store Requisition Master" />
+    case 'purchase-order-process':
+      return <ProcurementView initialTab="pos" title="Purchase Order Process" description="Create, approve, receive, and track purchase orders." />
+    case 'purchase-invoice-entry':
+      return <ProcurementView initialTab="invoices" title="Purchase Invoice Entry" description="Capture vendor invoices, validate OCR, and match against purchase orders." />
+    case 'transfer-to-department':
+      return <StockTransferView title="Transfer to Department" description="Record stock movement from store to departments and confirm deductions." />
+    case 'stock-tracking':
+      return <TransactionsView title="Stock Tracking" />
     default:
       return <DashboardView />
   }
@@ -328,6 +406,7 @@ export default function AppShell() {
       const isRoot = user?.empId === 'software'
       return hasRole && (!config.rootOnly || isRoot)
     })
+    .filter(([id]) => user?.role !== 'admin' || !ADMIN_DUPLICATE_VIEW_IDS.has(id))
     .map(([id, config]) => {
       let label = config.label
       if (id === 'requests' && user?.role === 'employee') label = 'My Requests'
@@ -349,14 +428,22 @@ export default function AppShell() {
 
   const isOnline = useOnlineStatus()
 
+  const resolvedView = resolveViewForUser(currentView, user)
+
+  useEffect(() => {
+    if (currentView !== resolvedView) {
+      setCurrentView(resolvedView)
+    }
+  }, [currentView, resolvedView, setCurrentView])
+
   // Load feature flags on mount
   useEffect(() => {
     async function loadFlags() {
       try {
         const flags = await api.settings.getFlags()
         useAppStore.getState().setFlags(flags)
-      } catch (err) {
-        console.error('[AppShell] Failed to load feature flags:', err)
+      } catch {
+        // Feature flags are optional for shell startup; keep the UI usable even if the API is unavailable.
       }
     }
     loadFlags()
@@ -401,7 +488,7 @@ export default function AppShell() {
     })
   }
 
-  const viewInfo = VIEW_CONFIG[currentView] || VIEW_CONFIG.dashboard
+  const viewInfo = VIEW_CONFIG[resolvedView] || VIEW_CONFIG.dashboard
   const initials = user?.name
     ? user.name
       .split(' ')
@@ -453,7 +540,7 @@ export default function AppShell() {
                     {groupItems.map((item) => (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
-                          isActive={currentView === item.id}
+                          isActive={resolvedView === item.id}
                           onClick={() => setCurrentView(item.id)}
                           tooltip={flags.tooltips ? item.label : undefined}
                           className="gap-3"
@@ -563,7 +650,7 @@ export default function AppShell() {
         {/* Content */}
         <div className="flex-1 p-4 md:p-6">
           <ErrorBoundary>
-            <ViewRenderer view={currentView} user={user} onPitchModeChange={setPitchMode} />
+            <ViewRenderer view={resolvedView} user={user} onPitchModeChange={setPitchMode} />
           </ErrorBoundary>
         </div>
       </SidebarInset>
