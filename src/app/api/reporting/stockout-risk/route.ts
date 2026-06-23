@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const [items, consumptionGroups] = await Promise.all([
       db.item.findMany({
-        where: { deletedAt: null },
+        where: { deletedAt: null, active: true },
         select: { id: true, name: true, stock: true, reservedQty: true, minStock: true, unit: true },
       }),
       db.transaction.groupBy({

@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const items = await db.item.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, active: true },
       select: { id: true, name: true, category: true, stock: true, price: true },
     });
 
