@@ -4,8 +4,9 @@ import { Prisma } from '@prisma/client';
 import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 import { requestCreateSchema } from '@/lib/validation';
+import { flattenRequest } from '@/lib/request-fulfillment';
 
-const ALLOWED_SORT_FIELDS = ['createdAt', 'updatedAt', 'qty', 'status'] as const;
+const ALLOWED_SORT_FIELDS = ['createdAt', 'updatedAt', 'status'] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,7 +29,6 @@ export async function GET(request: NextRequest) {
 
     if (status) where.status = status;
 
-    // Validate sort field to prevent arbitrary injection
     const [rawField, rawDir] = sortBy.split('_');
     const safeField = (ALLOWED_SORT_FIELDS as readonly string[]).includes(rawField)
       ? rawField
@@ -36,12 +36,15 @@ export async function GET(request: NextRequest) {
     const safeDir = rawDir === 'asc' ? 'asc' : 'desc';
     const orderBy = { [safeField]: safeDir } as Prisma.RequestOrderByWithRelationInput;
 
-    // No `include` — the user relation was fetched and immediately discarded before
-    // Cap at 500 to prevent unbounded queries; clients can filter by status to narrow results
     const limit = Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '500')));
-    const requests = await db.request.findMany({ where, orderBy, take: limit });
+    const requests = await db.request.findMany({
+      where,
+      orderBy,
+      take: limit,
+      include: { lines: true },
+    });
 
-    return NextResponse.json({ requests });
+    return NextResponse.json({ requests: requests.map(flattenRequest) });
   } catch (error) {
     return handleApiError(error);
   }
@@ -53,52 +56,145 @@ export async function POST(request: NextRequest) {
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
-    // Schema enforces integer qty >= 1 (prevents fractional reservations on Int stock)
-    const { userId, itemId, qty } = requestCreateSchema.parse(body);
-    const note: string | undefined = typeof body.note === 'string' ? body.note : undefined;
+
+    // Back-compat: a legacy single { itemId, qty } body becomes one line.
+    const normalized = {
+      userId: body.userId,
+      requiredDate: typeof body.requiredDate === 'string' ? body.requiredDate : undefined,
+      machine: typeof body.machine === 'string' ? body.machine : undefined,
+      concernPerson: typeof body.concernPerson === 'string' ? body.concernPerson : undefined,
+      note: typeof body.note === 'string' ? body.note : undefined,
+      priority: typeof body.priority === 'string' ? body.priority : 'MEDIUM',
+      purpose: typeof body.purpose === 'string' ? body.purpose : undefined,
+      remarks: typeof body.remarks === 'string' ? body.remarks : undefined,
+      attachments: typeof body.attachments === 'string' ? body.attachments : undefined,
+      lines: Array.isArray(body.lines)
+        ? body.lines
+        : body.itemId
+          ? [{ itemId: body.itemId, qty: body.qty }]
+          : [],
+    };
+    const { userId, requiredDate, machine, concernPerson, note, priority, purpose, remarks, attachments, lines } = requestCreateSchema.parse(normalized);
 
     // Employees can only create requests for themselves
     if (auth.user?.role === 'employee' && userId !== auth.user.id) {
       throw new ApiError(403, 'You can only create requests for yourself', 'FORBIDDEN');
     }
 
+    // Aggregate requested qty per item so duplicate lines don't over-reserve stock.
+    const qtyByItem = new Map<string, number>();
+    for (const l of lines) qtyByItem.set(l.itemId, (qtyByItem.get(l.itemId) ?? 0) + l.qty);
+
     const result = await db.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) throw new ApiError(404, 'User not found', 'NOT_FOUND');
 
-      const item = await tx.item.findUnique({ where: { id: itemId } });
-      if (!item || item.deletedAt) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
+      const lineData: {
+        itemId: string;
+        itemName: string;
+        requestedQty: number;
+        availableQtySnapshot: number;
+        availableQty: number;
+        pendingPurchaseQty: number;
+        fulfillmentStatus: string;
+        unit: string;
+        status: string;
+      }[] = [];
 
-      const available = item.stock - item.reservedQty;
-      if (available < qty) {
-        throw new ApiError(409, `Insufficient stock. Available: ${available}`, 'CONFLICT');
+      let hasDeficit = false;
+
+      for (const [itemId, totalQty] of qtyByItem) {
+        const item = await tx.item.findUnique({ where: { id: itemId } });
+        if (!item || item.deletedAt || item.active === false) {
+          throw new ApiError(400, `Item is inactive, deleted, or unavailable: ${item?.name || itemId}`, 'BAD_REQUEST');
+        }
+
+        // available_qty = current_stock
+        const available = Math.max(0, item.stock);
+        let remainingStock = available;
+
+        // Loop over each line for this item in the request to allocate stock sequentially
+        for (const l of lines.filter((x) => x.itemId === itemId)) {
+          const requested = l.qty;
+          let statusStr = "Pending";
+          let fulfillmentStatus = "PENDING_CHECK";
+          let lineAvailableQty = 0;
+          let linePendingPurchaseQty = 0;
+          let reserveQty = 0;
+
+          if (remainingStock <= 0) {
+            // Case 2: available_qty = 0
+            fulfillmentStatus = "PURCHASE_REQUIRED";
+            lineAvailableQty = 0;
+            linePendingPurchaseQty = requested;
+            reserveQty = 0;
+            statusStr = "Pending";
+            hasDeficit = true;
+          } else if (requested <= remainingStock) {
+            // Case 1: requested_qty <= available_qty
+            fulfillmentStatus = "READY_FOR_ISSUE";
+            lineAvailableQty = requested;
+            linePendingPurchaseQty = 0;
+            reserveQty = requested;
+            remainingStock -= requested;
+            statusStr = body.status === 'DRAFT' ? 'DRAFT' : 'SUBMITTED';
+          } else {
+            // Case 3: requested_qty > available_qty
+            fulfillmentStatus = "PARTIALLY_AVAILABLE";
+            lineAvailableQty = remainingStock;
+            linePendingPurchaseQty = requested - remainingStock;
+            reserveQty = remainingStock;
+            remainingStock = 0;
+            statusStr = body.status === 'DRAFT' ? 'DRAFT' : 'UNDER_REVIEW';
+            hasDeficit = true;
+          }
+
+          if (reserveQty > 0 && body.status !== 'DRAFT') {
+            await tx.item.update({
+              where: { id: itemId },
+              data: { reservedQty: { increment: reserveQty }, version: { increment: 1 } },
+            });
+          }
+
+          lineData.push({
+            itemId,
+            itemName: item.name,
+            requestedQty: requested,
+            availableQtySnapshot: available,
+            availableQty: lineAvailableQty,
+            pendingPurchaseQty: linePendingPurchaseQty,
+            fulfillmentStatus,
+            unit: item.unit,
+            status: body.status === 'DRAFT' ? 'DRAFT' : statusStr,
+          });
+        }
       }
 
-      const updatedItem = await tx.item.update({
-        where: { id: itemId },
-        data: { 
-          reservedQty: { increment: qty },
-          version: { increment: 1 } 
-        },
-      });
+      const status = body.status === 'DRAFT' ? 'DRAFT' : (hasDeficit ? 'UNDER_REVIEW' : 'SUBMITTED');
 
       const req = await tx.request.create({
         data: {
           userId,
           employee: user.name,
           department: user.department,
-          itemId,
-          itemName: item.name,
-          qty,
+          concernPerson: concernPerson?.trim() || null,
+          requiredDate: requiredDate ? new Date(requiredDate) : null,
+          machine: machine?.trim() || null,
           note: note?.trim() || null,
-          status: 'Pending',
+          priority,
+          purpose: purpose?.trim() || null,
+          remarks: remarks?.trim() || null,
+          attachments: attachments?.trim() || null,
+          status,
+          lines: { create: lineData },
         },
+        include: { lines: true },
       });
 
-      return { request: req, item: updatedItem };
+      return req;
     });
 
-    return NextResponse.json({ request: result.request }, { status: 201 });
+    return NextResponse.json({ request: flattenRequest(result) }, { status: 201 });
   } catch (error) {
     return handleApiError(error);
   }
