@@ -2,11 +2,15 @@ const express = require('express');
 const db = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
+const { businessToday, toBusinessDateStr } = require('../services/dates');
+const { escapeHtml } = require('../services/html');
 
 const router = express.Router();
 
 async function fifoPick(itemId, qtyRequired, trx) {
-  const today = new Date().toISOString().split('T')[0];
+  // Business "today" in IST — must match the nightly expiry cutoff so a batch
+  // is never dropped from FIFO while still counted as sellable (or vice-versa).
+  const today = businessToday();
   const batches = await trx('batches')
     .where({ item_id: itemId })
     .where('qty_remaining', '>', 0)
@@ -124,10 +128,19 @@ router.post('/:id/lines', authenticate, authorize('admin', 'sales'), async (req,
     const item = await db('items').where({ id: item_id }).first();
     if (!item) return res.status(400).json({ success: false, error: 'Item not found' });
 
-    // Validate FIFO availability without committing
+    // Validate FIFO availability for this item's CUMULATIVE pending qty across
+    // all draft lines — not just this line alone — so two lines for the same
+    // item can't both pass here and then fail (permanently) at confirm.
+    const pending = await db('outward_lines')
+      .where({ outward_id: req.params.id, item_id })
+      .whereNull('batch_id')
+      .sum({ q: 'qty' })
+      .first();
+    const cumulativeQty = (parseFloat(pending && pending.q) || 0) + parseFloat(qty);
+
     const trx = await db.transaction();
     try {
-      await fifoPick(item_id, parseFloat(qty), trx);
+      await fifoPick(item_id, cumulativeQty, trx);
       await trx.rollback();
     } catch (fifoErr) {
       await trx.rollback();
@@ -171,7 +184,10 @@ router.delete('/:id/lines/:line_id', authenticate, authorize('admin', 'sales'), 
 router.post('/:id/confirm', authenticate, authorize('admin', 'sales'), async (req, res, next) => {
   const trx = await db.transaction();
   try {
-    const entry = await trx('outward_entries').where({ id: req.params.id }).first();
+    // Row-lock the entry so two concurrent confirms can't both pass the draft
+    // check and deduct stock twice. The second request blocks here, then re-reads
+    // the committed row (now 'confirmed') and is rejected below.
+    const entry = await trx('outward_entries').where({ id: req.params.id }).forUpdate().first();
     if (!entry) { await trx.rollback(); return res.status(404).json({ success: false, error: 'Outward entry not found' }); }
     if (entry.status !== 'draft') { await trx.rollback(); return res.status(409).json({ success: false, error: 'Entry is not in draft status' }); }
 
@@ -231,16 +247,18 @@ router.post('/:id/confirm', authenticate, authorize('admin', 'sales'), async (re
 router.post('/:id/lock', authenticate, authorize('admin', 'sales'), async (req, res, next) => {
   const trx = await db.transaction();
   try {
-    const entry = await trx('outward_entries').where({ id: req.params.id }).first();
+    // Row-lock the entry so two concurrent locks can't both generate a challan
+    // number for the same entry (the second would overwrite the first).
+    const entry = await trx('outward_entries').where({ id: req.params.id }).forUpdate().first();
     if (!entry) { await trx.rollback(); return res.status(404).json({ success: false, error: 'Outward entry not found' }); }
     if (entry.status !== 'confirmed') { await trx.rollback(); return res.status(409).json({ success: false, error: 'Entry must be confirmed before locking' }); }
 
-    const dispatchDate = new Date(entry.dispatch_date);
-    const dateStr = dispatchDate.toISOString().split('T')[0].replace(/-/g, '');
-    const dayStart = new Date(dispatchDate);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(dispatchDate);
-    dayEnd.setHours(23, 59, 59, 999);
+    // Challan numbers are sequential per dispatch DATE. Format the date in
+    // business tz (IST) — pg returns dispatch_date as a local-midnight Date, so
+    // toISOString() would shift it to the previous day on IST/positive-offset
+    // hosts, producing a wrong date segment and a two-day count window.
+    const dispatchDateStr = toBusinessDateStr(entry.dispatch_date); // 'YYYY-MM-DD'
+    const dateStr = dispatchDateStr.replace(/-/g, '');              // 'YYYYMMDD'
 
     // Advisory lock prevents two concurrent lock operations on the same date
     // from generating duplicate challan numbers.
@@ -248,7 +266,7 @@ router.post('/:id/lock', authenticate, authorize('admin', 'sales'), async (req, 
 
     const countRow = await trx('outward_entries')
       .where('status', 'locked')
-      .whereBetween('dispatch_date', [dayStart.toISOString().split('T')[0], dayEnd.toISOString().split('T')[0]])
+      .where('dispatch_date', dispatchDateStr)
       .count('id as cnt')
       .first();
 
@@ -335,10 +353,10 @@ router.get('/:id/challan', authenticate, async (req, res, next) => {
 
       return `<tr>
         <td>${idx + 1}</td>
-        <td><span style="font-family:monospace;font-size:11px;background:#f5f5f5;padding:1px 5px;border-radius:3px;">${l.item_code}</span></td>
-        <td>${itemName}</td>
+        <td><span style="font-family:monospace;font-size:11px;background:#f5f5f5;padding:1px 5px;border-radius:3px;">${escapeHtml(l.item_code)}</span></td>
+        <td>${escapeHtml(itemName)}</td>
         <td>${batchExpiry}</td>
-        <td>${l.unit || 'kg'}</td>
+        <td>${escapeHtml(l.unit || 'kg')}</td>
         <td>${qty.toFixed(2)}</td>
         <td>${rate != null ? '&#8377;' + rate.toFixed(2) : '&mdash;'}</td>
         <td>${subtotal != null ? '&#8377;' + subtotal.toFixed(2) : '&mdash;'}</td>
@@ -393,9 +411,9 @@ router.get('/:id/challan', authenticate, async (req, res, next) => {
   <div class="meta">
     <div class="meta-block">
       <h4>Bill To</h4>
-      <strong>${entry.customer_name}</strong><br>
-      ${entry.customer_contact || ''}<br>
-      ${entry.customer_address || ''}
+      <strong>${escapeHtml(entry.customer_name)}</strong><br>
+      ${escapeHtml(entry.customer_contact || '')}<br>
+      ${escapeHtml(entry.customer_address || '')}
     </div>
     <div class="meta-block" style="text-align:right">
       <h4>Challan Details</h4>

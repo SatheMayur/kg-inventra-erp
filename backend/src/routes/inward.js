@@ -6,6 +6,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const { logAudit } = require('../services/audit');
 const { generateEAN13 } = require('../services/barcode');
 const { normalize, TAXONOMY } = require('../services/normalize');
+const { businessToday, toBusinessDateStr } = require('../services/dates');
 
 const router = express.Router();
 
@@ -161,6 +162,8 @@ router.post('/opening-stock', authenticate, authorize('admin'), upload.single('f
     preview: [],
   };
 
+  // Phase 1: validate & plan (read-only DB work). Any fatal validation error aborts entire import.
+  const plans = [];
   for (let i = 0; i < rows.length; i++) {
     const rowNum = i + 2;
     const raw = rows[i];
@@ -198,117 +201,134 @@ router.post('/opening-stock', authenticate, authorize('admin'), upload.single('f
       expiryDate = parsed.toISOString().split('T')[0];
     }
 
-    const trx = await db.transaction();
-    const rowPreview = {
-      row: rowNum,
-      action: null,             // CREATE_ITEM | MATCH_PRIMARY | MATCH_ALIAS | MATCH_CANONICAL
-      item_code: null,
-      canonical_name: null,
-      category: null,
-      sub_category: null,
-      vendor_barcode: externalBarcode || null,
-      alias_action: 'NONE',     // NONE | REGISTER | ALREADY
-      batch_qty: qty,
-      receipt_date: receiptDate,
-      expiry_date: expiryDate,
-      purchase_rate: purchaseRate || null,
-    };
-    try {
-      let item = null;
-      let aliasResolved = false;
+    // Read-only resolution checks
+    let plan = { row: rowNum, externalBarcode, itemName, subCategoryHint, qty, purchaseRate, mrp, storageLocation, receiptDate, expiryDate };
 
-      // 1. Try primary barcode
+    try {
+      // Try primary barcode
       if (externalBarcode) {
-        item = await trx('items').where({ barcode: externalBarcode }).first();
+        const item = await db('items').where({ barcode: externalBarcode }).first();
         if (item) {
-          rowPreview.action = 'MATCH_PRIMARY';
-        } else {
-          const alias = await trx('item_aliases').where({ alias_barcode: externalBarcode }).first();
-          if (alias) {
-            item = await trx('items').where({ id: alias.item_id }).first();
-            aliasResolved = true;
-            rowPreview.action = 'MATCH_ALIAS';
+          plan.match = 'PRIMARY';
+          plan.item = item;
+          summary.items_matched++;
+          plans.push(plan);
+          continue;
+        }
+        const alias = await db('item_aliases').where({ alias_barcode: externalBarcode }).first();
+        if (alias) {
+          const aliItem = await db('items').where({ id: alias.item_id }).first();
+          if (aliItem) {
+            plan.match = 'ALIAS';
+            plan.item = aliItem;
+            summary.items_matched++;
+            plans.push(plan);
+            continue;
           }
         }
       }
 
-      // 2. Resolve canonical info via normalizer when needed
+      // Resolve canonical via normalizer
       let normalized = null;
       if (itemName) normalized = normalize(itemName);
 
-      // 3. Match existing by variant_grade (canonical name) if barcode didn't resolve
-      if (!item && normalized && normalized.canonical_name) {
-        const sameCanonical = await trx('items')
-          .whereRaw('LOWER(variant_grade) = LOWER(?)', [normalized.canonical_name])
-          .first();
+      // Try match by canonical name
+      if (normalized && normalized.canonical_name) {
+        const sameCanonical = await db('items').whereRaw('LOWER(variant_grade) = LOWER(?)', [normalized.canonical_name]).first();
         if (sameCanonical) {
-          item = sameCanonical;
-          rowPreview.action = 'MATCH_CANONICAL';
+          plan.match = 'CANONICAL';
+          plan.item = sameCanonical;
+          summary.items_matched++;
+          plans.push(plan);
+          continue;
         }
       }
 
-      // 4. Create new item if no match
-      if (!item) {
-        if (!normalized || !normalized.canonical_name) {
-          await trx.rollback();
-          summary.errors.push({ row: rowNum, error: 'item_name required when barcode is new' });
-          continue;
-        }
-        const subCategoryId = await resolveSubCategoryId(
-          trx, subCategoryHint, normalized.canonical_name
-        );
-        if (!subCategoryId) {
-          await trx.rollback();
-          summary.errors.push({
-            row: rowNum,
-            error: `cannot resolve sub_category for "${normalized.canonical_name}". Supply sub_category column or use a known canonical.`,
-          });
-          continue;
-        }
+      // For a new item, ensure normalized canonical exists and we can resolve sub_category
+      if (!normalized || !normalized.canonical_name) {
+        summary.errors.push({ row: rowNum, error: 'item_name required when barcode is new' });
+        continue;
+      }
+      const subCategoryId = await resolveSubCategoryId(db, subCategoryHint, normalized.canonical_name);
+      if (!subCategoryId) {
+        summary.errors.push({ row: rowNum, error: `cannot resolve sub_category for "${normalized.canonical_name}". Supply sub_category column or use a known canonical.` });
+        continue;
+      }
 
-        const itemCode = await nextItemCode(trx);
+      plan.match = 'CREATE';
+      plan.normalized = normalized;
+      plan.sub_category_id = subCategoryId;
+      plans.push(plan);
+    } catch (err) {
+      summary.errors.push({ row: rowNum, error: err.message });
+    }
+  }
+
+  // If any validation errors, abort and report — no writes performed.
+  if (summary.errors.length > 0) {
+    return res.status(400).json({ success: false, data: summary });
+  }
+
+  // Phase 2: perform writes in a single transaction (atomic). If dryRun, we will rollback at the end.
+  const trx = await db.transaction();
+  try {
+    for (const plan of plans) {
+      const rowPreview = {
+        row: plan.row,
+        action: null,
+        item_code: null,
+        canonical_name: null,
+        category: null,
+        sub_category: null,
+        vendor_barcode: plan.externalBarcode || null,
+        alias_action: 'NONE',
+        batch_qty: plan.qty,
+        receipt_date: plan.receiptDate,
+        expiry_date: plan.expiryDate,
+        purchase_rate: plan.purchaseRate || null,
+      };
+
+      let item = plan.item || null;
+
+      if (plan.match === 'PRIMARY' || plan.match === 'ALIAS' || plan.match === 'CANONICAL') {
+        rowPreview.action = plan.match === 'PRIMARY' ? 'MATCH_PRIMARY' : plan.match === 'ALIAS' ? 'MATCH_ALIAS' : 'MATCH_CANONICAL';
+      }
+
+      // CREATE path
+      if (plan.match === 'CREATE') {
         const tempBarcode = 'TEMP_' + require('crypto').randomBytes(8).toString('hex');
         const [created] = await trx('items')
           .insert({
-            sub_category_id: subCategoryId,
-            item_code: itemCode,
+            sub_category_id: plan.sub_category_id,
             barcode: tempBarcode,
             unit: 'kg',
-            variant_grade: normalized.canonical_name,
-            purchase_rate: purchaseRate || null,
-            mrp: mrp,
-            storage_location: storageLocation,
-            description: `Auto-created from opening-stock import (${normalized.category}/${normalized.sub_category})`,
+            variant_grade: plan.normalized.canonical_name,
+            purchase_rate: plan.purchaseRate || null,
+            mrp: plan.mrp,
+            storage_location: plan.storageLocation,
+            description: `Auto-created from opening-stock import (${plan.normalized.category}/${plan.normalized.sub_category})`,
             is_active: true,
           })
           .returning('*');
 
+        // Use created.id to derive item_code and EAN-13 barcode
+        const item_code = 'FG-' + String(created.id).padStart(4, '0');
         const ean13 = generateEAN13(created.id);
         const [updated] = await trx('items')
           .where({ id: created.id })
-          .update({ barcode: ean13 })
+          .update({ item_code, barcode: ean13 })
           .returning('*');
 
-        await logAudit({
-          table_name: 'items', record_id: updated.id, action: 'INSERT',
-          user_id: req.user.id, new_value: updated,
-        }, trx);
-
+        await logAudit({ table_name: 'items', record_id: updated.id, action: 'INSERT', user_id: req.user.id, new_value: updated }, trx);
         item = updated;
         rowPreview.action = 'CREATE_ITEM';
         summary.items_created++;
-      } else {
-        summary.items_matched++;
       }
 
-      // Fill canonical info into preview (works for both new + matched paths)
-      rowPreview.item_code = item.item_code;
-      rowPreview.canonical_name = item.variant_grade;
-      if (normalized) {
-        rowPreview.category = normalized.category;
-        rowPreview.sub_category = normalized.sub_category;
-      } else {
-        // Look up taxonomy via sub_category join
+      // Fill preview taxonomy and codes
+      if (item) {
+        rowPreview.item_code = item.item_code;
+        rowPreview.canonical_name = item.variant_grade;
         const subRow = await trx('sub_categories')
           .join('categories', 'categories.id', 'sub_categories.category_id')
           .where('sub_categories.id', item.sub_category_id)
@@ -320,55 +340,44 @@ router.post('/opening-stock', authenticate, authorize('admin'), upload.single('f
         }
       }
 
-      // 5. Register vendor barcode as alias
-      if (externalBarcode && externalBarcode !== item.barcode && !aliasResolved) {
-        const existsAlias = await trx('item_aliases').where({ alias_barcode: externalBarcode }).first();
-        if (!existsAlias) {
-          await trx('item_aliases').insert({
-            item_id: item.id,
-            alias_barcode: externalBarcode,
-            alias_name: itemName || null,
-          });
-          summary.aliases_registered++;
-          rowPreview.alias_action = 'REGISTER';
-        } else {
-          rowPreview.alias_action = 'ALREADY';
+      // Register alias if vendor barcode present and not equal to primary
+      if (plan.externalBarcode && item && plan.externalBarcode !== item.barcode) {
+        try {
+          const existsAlias = await trx('item_aliases').where({ alias_barcode: plan.externalBarcode }).first();
+          if (!existsAlias) {
+            await trx('item_aliases').insert({ item_id: item.id, alias_barcode: plan.externalBarcode, alias_name: plan.itemName || null });
+            summary.aliases_registered++;
+            rowPreview.alias_action = 'REGISTER';
+          } else {
+            rowPreview.alias_action = 'ALREADY';
+          }
+        } catch (e) {
+          // Handle unique-constraint race: treat as already registered
+          if (e && e.code === '23505') {
+            rowPreview.alias_action = 'ALREADY';
+          } else {
+            throw e;
+          }
         }
       }
 
-      // 6. Create batch
+      // Create batch
       const [batch] = await trx('batches')
-        .insert({
-          item_id: item.id,
-          receipt_date: receiptDate,
-          expiry_date: expiryDate,
-          qty_received: qty,
-          qty_remaining: qty,
-        })
+        .insert({ item_id: item.id, receipt_date: plan.receiptDate, expiry_date: plan.expiryDate || null, qty_received: plan.qty, qty_remaining: plan.qty })
         .returning('*');
-
-      await logAudit({
-        table_name: 'batches', record_id: batch.id, action: 'INSERT',
-        user_id: req.user.id, new_value: batch,
-      }, trx);
-
+      await logAudit({ table_name: 'batches', record_id: batch.id, action: 'INSERT', user_id: req.user.id, new_value: batch }, trx);
       summary.batches_created++;
       summary.preview.push(rowPreview);
-
-      if (dryRun) {
-        await trx.rollback();
-      } else {
-        await trx.commit();
-      }
-    } catch (e) {
-      await trx.rollback();
-      summary.errors.push({ row: rowNum, error: e.message });
     }
-  }
 
-  // Dry-run never persists counters in the wider system either.
-  if (dryRun) {
-    // The numbers we report are forecasted: zero out only when nothing happened.
+    if (dryRun) {
+      await trx.rollback();
+    } else {
+      await trx.commit();
+    }
+  } catch (e) {
+    await trx.rollback();
+    return next(e);
   }
 
   res.json({ success: true, data: summary });
@@ -651,20 +660,25 @@ router.delete('/:id/lines/:line_id', authenticate, authorize('admin', 'purchase'
 router.post('/:id/confirm', authenticate, authorize('admin', 'purchase', 'warehouse'), async (req, res, next) => {
   const trx = await db.transaction();
   try {
-    const entry = await trx('inward_entries').where({ id: req.params.id }).first();
+    // Row-lock the entry so two concurrent confirms can't both pass the draft
+    // check and create a full set of batches twice (doubling received stock).
+    const entry = await trx('inward_entries').where({ id: req.params.id }).forUpdate().first();
     if (!entry) { await trx.rollback(); return res.status(404).json({ success: false, error: 'Inward entry not found' }); }
     if (entry.status !== 'draft') { await trx.rollback(); return res.status(409).json({ success: false, error: 'Entry is not in draft status' }); }
 
     const lines = await trx('inward_lines').where({ inward_id: req.params.id });
     if (lines.length === 0) { await trx.rollback(); return res.status(409).json({ success: false, error: 'No lines exist on this entry' }); }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Batch receipt_date is the FIFO sort key, so it must reflect when goods
+    // were actually received — use the entry's invoice_date when present, not
+    // the confirm date, or back-dated stock would sort ahead of older stock.
+    const receiptDate = toBusinessDateStr(entry.invoice_date) || businessToday();
 
     for (const line of lines) {
       const [batch] = await trx('batches')
         .insert({
           item_id: line.item_id,
-          receipt_date: today,
+          receipt_date: receiptDate,
           expiry_date: line.expiry_date || null,
           qty_received: line.qty,
           qty_remaining: line.qty

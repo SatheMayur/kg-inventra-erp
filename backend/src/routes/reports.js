@@ -199,37 +199,72 @@ router.get('/margin', authenticate, async (req, res, next) => {
         db.raw('AVG(outward_lines.rate) as avg_dispatch_rate')
       );
 
+    // Include item fields on the expired aggregate so items that ONLY had
+    // shrinkage (expired but no dispatch in the period) still appear and count
+    // toward total shrinkage / net margin — a dispatched.map alone drops them.
     const expired = await db('batches')
       .join('items', 'items.id', 'batches.item_id')
+      .join('sub_categories', 'sub_categories.id', 'items.sub_category_id')
       .where('batches.expired_at', '>=', start)
       .where('batches.expired_at', '<', end)
-      .groupBy('items.id')
+      .groupBy('items.id', 'items.item_code', 'items.variant_grade', 'items.purchase_rate', 'sub_categories.name')
       .select(
         'items.id as item_id',
+        'items.item_code',
+        'items.variant_grade',
+        'items.purchase_rate',
+        'sub_categories.name as sub_category_name',
         db.raw('SUM(batches.expired_qty) as expired_qty')
       );
 
-    const expiredMap = {};
-    for (const e of expired) {
-      expiredMap[e.item_id] = parseFloat(e.expired_qty) || 0;
-    }
-
-    const result = dispatched.map(row => {
-      const pnl = itemPnL({
-        avgDispatchRate: parseFloat(row.avg_dispatch_rate) || 0,
-        purchaseRate: parseFloat(row.purchase_rate) || 0,
-        qtyDispatched: parseFloat(row.qty_dispatched) || 0,
-        expiredQty: expiredMap[row.item_id] || 0
-      });
-      return {
+    // Merge dispatched + expired into one row per item (union of both sets).
+    const byItem = new Map();
+    for (const row of dispatched) {
+      byItem.set(row.item_id, {
         item_id: row.item_id,
         item_code: row.item_code,
         item_name: row.variant_grade || row.sub_category_name,
         sub_category_name: row.sub_category_name,
+        purchase_rate: parseFloat(row.purchase_rate) || 0,
         qty_dispatched: parseFloat(row.qty_dispatched) || 0,
         avg_dispatch_rate: parseFloat(row.avg_dispatch_rate) || 0,
-        purchase_rate: parseFloat(row.purchase_rate) || 0,
-        expired_qty: expiredMap[row.item_id] || 0,
+        expired_qty: 0,
+      });
+    }
+    for (const row of expired) {
+      const existing = byItem.get(row.item_id);
+      if (existing) {
+        existing.expired_qty = parseFloat(row.expired_qty) || 0;
+      } else {
+        byItem.set(row.item_id, {
+          item_id: row.item_id,
+          item_code: row.item_code,
+          item_name: row.variant_grade || row.sub_category_name,
+          sub_category_name: row.sub_category_name,
+          purchase_rate: parseFloat(row.purchase_rate) || 0,
+          qty_dispatched: 0,
+          avg_dispatch_rate: 0,
+          expired_qty: parseFloat(row.expired_qty) || 0,
+        });
+      }
+    }
+
+    const result = [...byItem.values()].map(row => {
+      const pnl = itemPnL({
+        avgDispatchRate: row.avg_dispatch_rate,
+        purchaseRate: row.purchase_rate,
+        qtyDispatched: row.qty_dispatched,
+        expiredQty: row.expired_qty
+      });
+      return {
+        item_id: row.item_id,
+        item_code: row.item_code,
+        item_name: row.item_name,
+        sub_category_name: row.sub_category_name,
+        qty_dispatched: row.qty_dispatched,
+        avg_dispatch_rate: row.avg_dispatch_rate,
+        purchase_rate: row.purchase_rate,
+        expired_qty: row.expired_qty,
         ...pnl
       };
     });

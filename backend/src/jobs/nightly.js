@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const db = require('../config/db');
+const { businessToday, toBusinessDateStr } = require('../services/dates');
 
 function riskScore(qty, daysToExpiry, avgDailyVelocity, shelfLifeDays) {
   if (daysToExpiry <= 0) return 100;
@@ -22,14 +23,14 @@ function calcROP(avgDaily, leadDays, variabilityPct) {
 // (new Date().toISOString().split('T')[0]) so the "still sellable" boundary and
 // the "expired" boundary line up exactly with no overlap and no gap.
 function expiryCutoff(now = new Date()) {
-  return now.toISOString().split('T')[0];
+  return businessToday(now);
 }
 
 // Pure mirror of the SQL predicate used by Job 1 (`expiry_date < cutoff`),
 // exported for regression testing of the same-day-expiry boundary.
 function isBatchExpired(expiryDate, now = new Date()) {
   if (!expiryDate) return false;
-  const exp = new Date(expiryDate).toISOString().split('T')[0];
+  const exp = toBusinessDateStr(expiryDate);
   return exp < expiryCutoff(now);
 }
 
@@ -37,19 +38,28 @@ async function runNightly() {
   const result = { started_at: new Date(), jobs: {} };
   const today = new Date();
 
-  // Job 0: Recalculate avg_daily_consumption from rolling 30-day dispatch window
-  const dispatchData = await db('outward_lines')
-    .join('outward_entries', 'outward_entries.id', 'outward_lines.outward_id')
-    .where('outward_entries.status', 'locked')
-    .where('outward_entries.dispatch_date', '>=', db.raw("CURRENT_DATE - INTERVAL '30 days'"))
-    .groupBy('outward_lines.item_id')
-    .select('outward_lines.item_id', db.raw('SUM(outward_lines.qty) as total_qty'));
-
-  await Promise.all(dispatchData.map(row => {
-    const avgDaily = Math.round((parseFloat(row.total_qty) / 30) * 100) / 100;
-    return db('items').where({ id: row.item_id }).update({ avg_daily_consumption: avgDaily });
-  }));
-  result.jobs.avgDailyConsumptionUpdated = dispatchData.length;
+  // Job 0: Recompute avg_daily_consumption for EVERY item from the rolling
+  // 30-day locked-dispatch window. Items with no dispatch in the window must
+  // decay to 0 — otherwise a stale value keeps inflating rop_kg (Job 3) and
+  // suppressing risk scores (Job 2) forever. A single set-based UPDATE with a
+  // LEFT JOIN aggregate resets non-selling items in the same pass.
+  const avgUpdate = await db.raw(`
+    UPDATE items i
+    SET avg_daily_consumption = ROUND(COALESCE(d.total_qty, 0) / 30.0, 2)
+    FROM (
+      SELECT it.id,
+             SUM(ol.qty) FILTER (
+               WHERE oe.status = 'locked'
+                 AND oe.dispatch_date >= CURRENT_DATE - INTERVAL '30 days'
+             ) AS total_qty
+      FROM items it
+      LEFT JOIN outward_lines ol ON ol.item_id = it.id
+      LEFT JOIN outward_entries oe ON oe.id = ol.outward_id
+      GROUP BY it.id
+    ) d
+    WHERE d.id = i.id
+  `);
+  result.jobs.avgDailyConsumptionUpdated = avgUpdate.rowCount;
 
   // Job 1: Mark expired batches — only batches whose expiry_date is strictly
   // before today's DATE. Comparing against the full `today` timestamp (the cron
@@ -78,9 +88,12 @@ async function runNightly() {
       'sub_categories.shelf_life_days'
     );
 
+  // Whole calendar days from today (IST business date) to each batch's expiry.
+  // Date-only so the 02:00 cron time can't shave a day off via Math.floor.
+  const todayStr = businessToday(today);
   await Promise.all(activeBatches.map(b => {
     const daysToExpiry = b.expiry_date
-      ? Math.floor((new Date(b.expiry_date) - today) / 86400000)
+      ? Math.round((Date.parse(toBusinessDateStr(b.expiry_date)) - Date.parse(todayStr)) / 86400000)
       : 9999;
     const score = riskScore(
       parseFloat(b.qty_remaining),

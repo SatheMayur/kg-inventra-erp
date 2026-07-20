@@ -5,6 +5,7 @@ const db = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 const { generateEAN13 } = require('../services/barcode');
 const { logAudit } = require('../services/audit');
+const { escapeHtml } = require('../services/html');
 
 const router = express.Router();
 
@@ -732,7 +733,7 @@ router.post('/labels', authenticate, async (req, res, next) => {
           : { bcid: 'ean13', text: item.barcode, scale: 3, height: 15, includetext: true, textxalign: 'center' }
         );
         const b64 = png.toString('base64');
-        return `<div class="label"><img src="data:image/png;base64,${b64}" /><div class="code">${item.item_code}</div><div class="grade">${item.variant_grade || ''}</div></div>`;
+        return `<div class="label"><img src="data:image/png;base64,${b64}" /><div class="code">${escapeHtml(item.item_code)}</div><div class="grade">${escapeHtml(item.variant_grade || '')}</div></div>`;
       })
     );
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Labels</title><style>

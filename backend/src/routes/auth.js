@@ -9,24 +9,49 @@ const router = express.Router();
 
 const SALT_ROUNDS = 10;
 
-// In-memory rate limiter: max 5 attempts per IP per 15 minutes
+// In-memory login throttle: max 5 FAILED attempts per (IP + email) per 15 min.
+//
+// Keyed by IP+email (not IP alone) so staff sharing one office IP / NAT don't
+// lock each other out, and only FAILED attempts count — a successful login
+// clears the counter (see the handler). Expired records are pruned so the Map
+// can't grow unbounded.
+const WINDOW_MS = 15 * 60 * 1000;
+const MAX_FAILURES = 5;
 const _loginAttempts = new Map();
+
+function attemptKey(req) {
+  const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+  const email = String((req.body && req.body.email) || '').trim().toLowerCase();
+  return `${ip}|${email}`;
+}
+
 function loginRateLimit(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
   const now = Date.now();
-  const WINDOW = 15 * 60 * 1000;
-  const MAX = 5;
-  const rec = _loginAttempts.get(ip);
-  if (rec && rec.resetAt > now) {
-    if (rec.count >= MAX) {
-      const wait = Math.ceil((rec.resetAt - now) / 1000);
-      return res.status(429).json({ success: false, error: `Too many attempts. Try again in ${wait}s.` });
-    }
-    rec.count++;
-  } else {
-    _loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW });
+  const rec = _loginAttempts.get(attemptKey(req));
+  if (rec && rec.resetAt > now && rec.count >= MAX_FAILURES) {
+    const wait = Math.ceil((rec.resetAt - now) / 1000);
+    return res.status(429).json({ success: false, error: `Too many attempts. Try again in ${wait}s.` });
   }
   next();
+}
+
+function recordFailedLogin(req) {
+  const now = Date.now();
+  const key = attemptKey(req);
+  const rec = _loginAttempts.get(key);
+  if (rec && rec.resetAt > now) {
+    rec.count++;
+  } else {
+    _loginAttempts.set(key, { count: 1, resetAt: now + WINDOW_MS });
+  }
+  // Prune expired records so the Map stays bounded.
+  for (const [k, r] of _loginAttempts) {
+    if (r.resetAt <= now) _loginAttempts.delete(k);
+  }
+}
+
+function clearLoginAttempts(req) {
+  _loginAttempts.delete(attemptKey(req));
 }
 
 function validatePassword(pw) {
@@ -49,6 +74,7 @@ router.post('/login', loginRateLimit, async (req, res, next) => {
     const user = await db('users').where({ email }).first();
 
     if (!user) {
+      recordFailedLogin(req);
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
@@ -58,9 +84,11 @@ router.post('/login', loginRateLimit, async (req, res, next) => {
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
+      recordFailedLogin(req);
       return res.status(401).json({ success: false, error: 'Invalid email or password' });
     }
 
+    clearLoginAttempts(req);
     const token = jwt.sign(
       { id: user.id, role: user.role, name: user.name },
       process.env.JWT_SECRET,
