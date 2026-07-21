@@ -428,7 +428,7 @@ export default function WhatsAppInboxView() {
     <div className="h-[calc(100vh-100px)] min-h-[600px] w-full max-w-full min-w-0 border border-border/60 rounded-2xl bg-card shadow-xs overflow-hidden flex flex-col animate-in fade-in duration-300 relative">
       
       {/* 1. ConnectionStatusBar (Single Top Status Bar: Height 34px) */}
-      <div className="shrink-0 px-3 py-1 h-[34px] border-b border-border/40 bg-muted/40 flex items-center justify-between text-[12px] min-w-0 w-full gap-3">
+      <div className="shrink-0 px-4 py-1 h-[36px] border-b border-border/40 bg-muted/40 flex items-center justify-between text-xs min-w-0 w-full gap-3">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {sessionStatus === 'CONNECTED' ? (
             <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-semibold text-[10px] uppercase px-2 py-0 gap-1 h-[20px] leading-[1.2] shrink-0">
@@ -439,7 +439,7 @@ export default function WhatsAppInboxView() {
               <span className="size-1.5 rounded-full bg-amber-500" /> Offline Mode
             </Badge>
           )}
-          <span className="text-[12px] text-muted-foreground font-normal leading-[1.3] truncate min-w-0">
+          <span className="text-xs text-muted-foreground font-normal leading-snug truncate min-w-0">
             {sessionStatus === 'CONNECTED'
               ? 'WhatsApp bridge is connected. Live messages send and receive automatically.'
               : 'Historical messages are available for review, but live messaging is currently disconnected.'}
@@ -451,10 +451,10 @@ export default function WhatsAppInboxView() {
             type="button"
             variant="ghost"
             size="sm"
-            className="h-[22px] text-[11px] font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 gap-1 px-2 shrink-0"
+            className="h-6 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 gap-1 px-2 shrink-0"
             onClick={() => setCurrentView('integrations')}
           >
-            <ExternalLink className="size-[13px]" /> Connection Settings
+            <ExternalLink className="size-3.5" /> Connection Settings
           </Button>
         )}
       </div>
@@ -475,50 +475,50 @@ export default function WhatsAppInboxView() {
           style={{ width: '300px', minWidth: '280px', maxWidth: '320px' }}
         >
           {/* Header & Search */}
-          <div className="p-2 border-b border-border/40 space-y-1.5 bg-card/60 shrink-0">
+          <div className="p-3 border-b border-border/40 space-y-2 bg-card/60 shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="size-5 rounded-md bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shrink-0">
-                  <MessageCircle className="size-3" />
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shrink-0">
+                  <MessageCircle className="size-3.5" />
                 </div>
                 <div>
-                  <h3 className="text-[14px] font-semibold tracking-tight text-foreground leading-[1.2]">WhatsApp Console</h3>
-                  <p className="text-[10px] text-muted-foreground/80 leading-[1.2] font-normal">{threads.length} conversations</p>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground/60 leading-snug">WhatsApp Console</h3>
+                  <p className="text-[10px] text-muted-foreground/50 leading-snug font-normal">{threads.length} conversations</p>
                 </div>
               </div>
             </div>
 
             {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 size-[14px] text-muted-foreground pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Search contact, phone, REQ, PO..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-7 text-[12px] placeholder:text-[11.5px] h-[32px] bg-background border-border"
+                className="pl-9 pr-7 h-9 bg-background border-border"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  <X className="size-[14px]" />
+                  <X className="size-4" />
                 </button>
               )}
             </div>
 
             {/* Quick Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pt-0.5 min-w-0 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-0.5 min-w-0 whitespace-nowrap">
               {(['ALL', 'VENDORS', 'EMPLOYEES', 'LINKED'] as FilterTab[]).map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setFilterTab(tab)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] transition h-[24px] flex items-center justify-center shrink-0 ${
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] transition h-7 flex items-center justify-center shrink-0 font-bold uppercase tracking-wider ${
                     filterTab === tab
-                      ? 'bg-primary text-primary-foreground shadow-2xs font-semibold'
-                      : 'bg-muted/60 text-muted-foreground hover:bg-muted font-medium'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground'
                   }`}
                 >
                   {tab}
@@ -555,7 +555,7 @@ export default function WhatsAppInboxView() {
                     key={thread.phone}
                     type="button"
                     onClick={() => setActivePhone(thread.phone)}
-                    className={`w-full text-left px-2.5 py-1.5 h-[56px] flex flex-col justify-center transition-colors relative hover:bg-muted/40 min-w-0 overflow-hidden ${
+                    className={`w-full text-left px-3 py-2 h-[52px] flex flex-col justify-center transition-colors relative hover:bg-primary/5 min-w-0 overflow-hidden ${
                       isActive ? 'bg-primary/8 font-medium' : ''
                     }`}
                   >
@@ -563,7 +563,7 @@ export default function WhatsAppInboxView() {
 
                     {/* Top Row: Avatar + Contact Name Baseline Aligned with Timestamp */}
                     <div className="flex justify-between items-center gap-1.5 mb-0.5 min-w-0 w-full">
-                      <span className="font-semibold text-[12.5px] leading-[1.2] truncate flex items-center gap-1.5 text-foreground min-w-0 flex-1">
+                      <span className="font-semibold text-xs leading-snug truncate flex items-center gap-1.5 text-foreground min-w-0 flex-1">
                         <Avatar className="size-6 border shrink-0">
                           <AvatarFallback
                             className={`text-[8.5px] font-bold ${
@@ -579,19 +579,19 @@ export default function WhatsAppInboxView() {
                         </Avatar>
                         <span className="truncate min-w-0">{displayName}</span>
                       </span>
-                      <span className="text-[9px] font-normal text-muted-foreground/70 shrink-0 font-mono">
+                      <span className="text-[10px] font-normal text-muted-foreground/50 shrink-0 font-mono tabular-nums">
                         {thread.createdAt ? format(new Date(thread.createdAt), 'HH:mm') : ''}
                       </span>
                     </div>
 
                     {/* Bottom Row: Preview Text Baseline Aligned with Reference Badge */}
                     <div className="flex items-center justify-between pl-7 gap-1.5 min-w-0 w-full">
-                      <p className="text-[10.5px] font-normal leading-[1.25] text-muted-foreground truncate min-w-0 flex-1">
+                      <p className="text-[10px] font-normal leading-snug text-muted-foreground/60 truncate min-w-0 flex-1">
                         {thread.direction === 'OUTBOUND' && <span className="text-primary font-medium mr-1">You:</span>}
                         {thread.message}
                       </p>
                       {batchNum && (
-                        <Badge variant="outline" className="text-[9px] font-medium px-1 py-0 border-primary/30 text-primary font-mono shrink-0 h-[18px]">
+                        <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 border-primary/30 text-primary font-mono shrink-0 h-5">
                           {batchNum}
                         </Badge>
                       )}
@@ -610,24 +610,24 @@ export default function WhatsAppInboxView() {
         >
           {activePhone ? (
             <>
-              {/* Chat Header (Height: 48px, Padding: 10px 14px) */}
-              <div className="py-[10px] px-[14px] border-b border-border/40 bg-card flex items-center justify-between shrink-0 h-[48px] min-w-0 w-full">
+              {/* Chat Header */}
+              <div className="py-2.5 px-4 border-b border-border/40 bg-card flex items-center justify-between shrink-0 h-[44px] min-w-0 w-full">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Avatar className="size-6.5 border shrink-0">
-                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-[10.5px]">
+                  <Avatar className="size-7 border shrink-0">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-[10px]">
                       {getInitials(activeName)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold tracking-tight text-foreground flex items-center gap-1.5 leading-tight min-w-0">
+                    <div className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-1.5 leading-tight min-w-0">
                       <span className="truncate min-w-0">{activeName}</span>
                       {activeThread?.supplier && (
-                        <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-emerald-500/30 text-emerald-600 bg-emerald-500/5 h-[18px] shrink-0">
+                        <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 border-emerald-500/30 text-emerald-600 bg-emerald-500/5 h-5 shrink-0">
                           Vendor
                         </Badge>
                       )}
                       {activeThread?.userContact && (
-                        <Badge variant="outline" className="text-[9px] font-medium px-1.5 py-0 border-blue-500/30 text-blue-600 bg-blue-500/5 h-[18px] shrink-0">
+                        <Badge variant="outline" className="text-[10px] font-medium px-1.5 py-0 border-blue-500/30 text-blue-600 bg-blue-500/5 h-5 shrink-0">
                           Employee
                         </Badge>
                       )}
@@ -668,7 +668,7 @@ export default function WhatsAppInboxView() {
                       <Search className="size-3" />
                     </Button>
                   )}
-                  <Badge variant="outline" className="text-[10px] font-semibold font-mono border-border/60 uppercase h-[18px] px-1.5 tracking-tight shrink-0">
+                  <Badge variant="outline" className="text-[10px] font-bold font-mono border-border/60 uppercase h-5 px-1.5 tracking-tight shrink-0">
                     Live Chat
                   </Badge>
                 </div>
@@ -723,20 +723,20 @@ export default function WhatsAppInboxView() {
                           return (
                             <div
                               key={msg.id}
-                              className={`flex flex-col max-w-[68%] w-fit box-border ${
+                              className={`flex flex-col max-w-[65%] w-fit box-border ${
                                 isOutbound ? 'self-end items-end ml-auto mr-0' : 'self-start items-start mr-auto ml-0'
                               }`}
                             >
                               {/* Message Bubble Container with exact 12px 14px padding and rounded-[14px] */}
                               <div
-                                className={`px-3.5 py-3 rounded-[14px] text-[13px] font-normal leading-[1.42] shadow-2xs box-border overflow-wrap-break-word word-break-normal white-space-pre-wrap ${
+                                className={`px-3 py-2 rounded-xl text-xs font-normal leading-snug shadow-2xs box-border overflow-wrap-break-word word-break-normal white-space-pre-wrap ${
                                   isOutbound
-                                    ? 'bg-primary text-primary-foreground rounded-br-none'
-                                    : 'bg-card border border-border/70 rounded-bl-none text-foreground'
+                                    ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                    : 'bg-card border border-border/70 rounded-bl-sm text-foreground'
                                 }`}
                               >
                                 {!isOutbound && (
-                                  <div className="text-[10px] font-semibold opacity-85 text-primary mb-1">
+                                  <div className="text-[10px] font-semibold text-primary/80 mb-0.5">
                                     {activeName}
                                   </div>
                                 )}
@@ -749,7 +749,7 @@ export default function WhatsAppInboxView() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-1 mt-1 px-1 text-[9px] font-normal leading-[1.2] text-muted-foreground/70">
+                              <div className="flex items-center gap-1 mt-0.5 px-1 text-[10px] font-normal leading-snug text-muted-foreground/50">
                                 {isOutbound && <span className="font-medium text-primary">You</span>}
                                 {isOutbound && <span>•</span>}
                                 <span className="font-mono">{format(new Date(msg.createdAt), 'HH:mm')}</span>
@@ -789,13 +789,13 @@ export default function WhatsAppInboxView() {
                           handleSend(e)
                         }
                       }}
-                      className="bg-background border-border text-[12px] leading-[1.42] min-h-[34px] max-h-24 flex-1 resize-none p-1.5 min-w-0"
+                      className="bg-background border-border text-xs leading-snug min-h-[34px] max-h-24 flex-1 resize-none p-2 min-w-0"
                     />
 
                     <Button
                       type="submit"
                       disabled={sending || !inputText.trim()}
-                      className="h-[34px] bg-primary font-medium text-[11px] gap-1 px-3 shadow-2xs shrink-0"
+                      className="h-[34px] bg-primary font-medium text-xs gap-1.5 px-3 shadow-xs shrink-0"
                     >
                       {sending ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
                       Send
@@ -831,61 +831,61 @@ export default function WhatsAppInboxView() {
           style={{ width: '300px', minWidth: '280px', maxWidth: '320px' }}
         >
           {/* Tab Header (Grid 2 columns) */}
-          <div className="p-1 border-b border-border/40 bg-card/60 shrink-0 h-[34px] grid grid-cols-2 gap-1 min-w-0">
+          <div className="p-1 border-b border-border/40 bg-card/60 shrink-0 h-9 grid grid-cols-2 gap-1 min-w-0">
             <button
               type="button"
               onClick={() => setRightPanelTab('context')}
-              className={`flex items-center justify-center gap-1 py-1 px-2 rounded-md text-[11px] font-semibold transition min-w-0 whitespace-nowrap ${
+              className={`flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-semibold transition min-w-0 whitespace-nowrap ${
                 rightPanelTab === 'context'
-                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
                   : 'text-muted-foreground hover:bg-muted/50'
               }`}
             >
-              <Layers className="size-[13px] shrink-0" /> Context
+              <Layers className="size-3.5 shrink-0" /> Context
             </button>
             <button
               type="button"
               onClick={() => setRightPanelTab('assistant')}
-              className={`flex items-center justify-center gap-1 py-1 px-2 rounded-md text-[11px] font-semibold transition min-w-0 whitespace-nowrap ${
+              className={`flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-semibold transition min-w-0 whitespace-nowrap ${
                 rightPanelTab === 'assistant'
-                  ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20'
+                  ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 shadow-sm'
                   : 'text-muted-foreground hover:bg-muted/50'
               }`}
             >
-              <Sparkles className="size-[13px] shrink-0" /> AI Assistant
+              <Sparkles className="size-3.5 shrink-0" /> AI Assistant
             </button>
           </div>
 
           {/* Tab Content */}
           {rightPanelTab === 'context' ? (
             /* ====== RELATED BUSINESS CONTEXT TAB ====== */
-            <div className="p-3 flex-1 overflow-y-auto space-y-2 text-[11px] scrollbar-thin min-w-0">
+            <div className="p-3 flex-1 overflow-y-auto space-y-2.5 text-xs scrollbar-thin min-w-0">
               {hasAnyContext ? (
                 <div className="space-y-2 min-w-0">
                   
                   {/* Store Requisition Context */}
                   {linkedRequest && (
-                    <div className="p-2.5 rounded-lg bg-primary/5 border border-primary/20 space-y-1.5 min-w-0">
+                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2 min-w-0">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="font-mono font-semibold text-[10.5px] text-primary flex items-center gap-1 truncate min-w-0">
+                        <span className="font-mono font-semibold text-xs text-primary flex items-center gap-1 truncate min-w-0">
                           <ClipboardList className="size-3 shrink-0" /> REQ-{linkedRequest.id.slice(-6).toUpperCase()}
                         </span>
-                        <Badge variant="outline" className="text-[9.5px] uppercase font-semibold border-primary/30 text-primary h-[18px] px-1.5 shrink-0">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold border-primary/30 text-primary h-5 px-1.5 shrink-0">
                           {linkedRequest.status}
                         </Badge>
                       </div>
                       <div className="space-y-1 border-t border-primary/10 pt-1 text-[10px] min-w-0">
                         <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)] gap-2 items-center min-w-0">
-                          <span className="text-[9.5px] text-muted-foreground">Requester:</span>
-                          <strong className="text-foreground font-medium text-right truncate min-w-0">{linkedRequest.employee} ({linkedRequest.department})</strong>
+                          <span className="text-[10px] text-muted-foreground">Requester:</span>
+                          <strong className="text-xs text-foreground font-medium text-right truncate min-w-0">{linkedRequest.employee} ({linkedRequest.department})</strong>
                         </div>
-                        {linkedRequest.note && <div className="line-clamp-2 italic text-[9.5px] text-muted-foreground">"{linkedRequest.note}"</div>}
+                        {linkedRequest.note && <div className="line-clamp-2 italic text-[10px] text-muted-foreground/60">"{linkedRequest.note}"</div>}
                       </div>
                       {linkedRequest.lines?.length > 0 && (
                         <div className="space-y-1 pt-1 border-t border-primary/10">
-                          <div className="text-[9px] font-semibold uppercase text-muted-foreground">Requested Items ({linkedRequest.lines.length})</div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Requested Items ({linkedRequest.lines.length})</div>
                           {linkedRequest.lines.map((l: any) => (
-                            <div key={l.id} className="flex justify-between items-center p-1 bg-background border rounded text-[10px] gap-2 min-w-0">
+                            <div key={l.id} className="flex justify-between items-center p-1.5 bg-background border rounded-md text-xs gap-2 min-w-0">
                               <span className="font-medium truncate min-w-0">{l.itemName || l.item?.name}</span>
                               <span className="font-mono font-semibold shrink-0">{l.requestedQty} {l.unit}</span>
                             </div>
@@ -897,23 +897,23 @@ export default function WhatsAppInboxView() {
 
                   {/* Purchase Order Context */}
                   {linkedPO && (
-                    <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 space-y-1.5 min-w-0">
+                    <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-2 min-w-0">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="font-mono font-semibold text-[10.5px] text-emerald-600 flex items-center gap-1 truncate min-w-0">
+                        <span className="font-mono font-semibold text-xs text-emerald-600 flex items-center gap-1 truncate min-w-0">
                           <ShoppingCart className="size-3 shrink-0" /> {linkedPO.poNumber}
                         </span>
-                        <Badge variant="outline" className="text-[9.5px] uppercase font-semibold border-emerald-500/30 text-emerald-600 h-[18px] px-1.5 shrink-0">
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold border-emerald-500/30 text-emerald-600 h-5 px-1.5 shrink-0">
                           {linkedPO.status}
                         </Badge>
                       </div>
                       <div className="space-y-1 border-t border-emerald-500/10 pt-1 text-[10px] min-w-0">
                         <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)] gap-2 items-center min-w-0">
-                          <span className="text-[9.5px] text-muted-foreground">Vendor:</span>
-                          <strong className="text-foreground font-medium text-right truncate min-w-0">{linkedPO.supplier?.name}</strong>
+                            <span className="text-[10px] text-muted-foreground">Vendor:</span>
+                          <strong className="text-xs text-foreground font-medium text-right truncate min-w-0">{linkedPO.supplier?.name}</strong>
                         </div>
                         <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)] gap-2 items-center min-w-0">
-                          <span className="text-[9.5px] text-muted-foreground">Total:</span>
-                          <strong className="text-foreground font-medium text-right truncate min-w-0">₹{linkedPO.totalAmount?.toLocaleString()}</strong>
+                            <span className="text-[10px] text-muted-foreground">Total:</span>
+                          <strong className="text-xs text-foreground font-medium text-right truncate min-w-0">₹{linkedPO.totalAmount?.toLocaleString()}</strong>
                         </div>
                       </div>
                     </div>
@@ -921,26 +921,26 @@ export default function WhatsAppInboxView() {
 
                   {/* Daily Procurement Batch Context */}
                   {linkedBatch && (
-                    <div className="p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 space-y-1.5 min-w-0">
+                    <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/20 space-y-2 min-w-0">
                       <div className="flex items-center justify-between gap-2 min-w-0">
-                        <span className="font-mono font-semibold text-[10.5px] text-blue-600 truncate min-w-0">{linkedBatch.batchNumber}</span>
-                        <Badge variant="outline" className="text-[9.5px] uppercase font-semibold border-blue-500/30 text-blue-600 h-[18px] px-1.5 shrink-0">
+                        <span className="font-mono font-semibold text-xs text-blue-600 truncate min-w-0">{linkedBatch.batchNumber}</span>
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold border-blue-500/30 text-blue-600 h-5 px-1.5 shrink-0">
                           {linkedBatch.status}
                         </Badge>
                       </div>
 
-                      <div className="space-y-1 border-t border-blue-500/10 pt-1 text-[10px] min-w-0">
+                      <div className="space-y-1 border-t border-blue-500/10 pt-1 text-xs min-w-0">
                         <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)] gap-2 items-center min-w-0">
-                          <span className="text-[9.5px] text-muted-foreground">Delivery:</span>
-                          <strong className="text-foreground font-medium text-right truncate min-w-0">{linkedBatch.deliveryDate ? format(new Date(linkedBatch.deliveryDate), 'dd MMM yyyy') : 'Tomorrow'}</strong>
+                          <span className="text-[10px] text-muted-foreground">Delivery:</span>
+                          <strong className="text-xs text-foreground font-medium text-right truncate min-w-0">{linkedBatch.deliveryDate ? format(new Date(linkedBatch.deliveryDate), 'dd MMM yyyy') : 'Tomorrow'}</strong>
                         </div>
                         <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)] gap-2 items-center min-w-0">
-                          <span className="text-[9.5px] text-muted-foreground">Location:</span>
-                          <strong className="text-foreground font-medium text-right truncate min-w-0">{linkedBatch.deliveryLocation || 'Main Store'}</strong>
+                          <span className="text-[10px] text-muted-foreground">Location:</span>
+                          <strong className="text-xs text-foreground font-medium text-right truncate min-w-0">{linkedBatch.deliveryLocation || 'Main Store'}</strong>
                         </div>
                         <div className="grid grid-cols-[minmax(72px,auto)_minmax(0,1fr)] gap-2 items-center min-w-0">
-                          <span className="text-[9.5px] text-muted-foreground">Dept:</span>
-                          <strong className="text-foreground font-medium text-right truncate min-w-0">{linkedBatch.departmentName || 'Kitchen'}</strong>
+                          <span className="text-[10px] text-muted-foreground">Dept:</span>
+                          <strong className="text-xs text-foreground font-medium text-right truncate min-w-0">{linkedBatch.departmentName || 'Kitchen'}</strong>
                         </div>
                       </div>
                     </div>
@@ -948,18 +948,18 @@ export default function WhatsAppInboxView() {
 
                   {/* Contact Profile Details */}
                   {(linkedSupplier || activeUserContact) && (
-                    <div className="p-2.5 rounded-lg bg-card border border-border/40 space-y-1 shadow-2xs min-w-0">
-                      <div className="text-[9px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-                        <UserCheck className="size-2.5 text-primary shrink-0" /> CONTACT DETAILS
+                    <div className="p-3 rounded-xl bg-card border border-border/40 space-y-1.5 shadow-2xs min-w-0">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 flex items-center gap-1">
+                        <UserCheck className="size-3 text-primary shrink-0" /> CONTACT DETAILS
                       </div>
-                      <div className="font-semibold text-foreground text-[11px] truncate min-w-0">
+                      <div className="font-semibold text-foreground text-xs truncate min-w-0">
                         {linkedSupplier?.name || activeUserContact?.name}
                       </div>
                       <div className="text-[10px] font-normal text-muted-foreground flex items-center gap-1 font-mono truncate min-w-0">
-                        <Phone className="size-2.5 text-primary shrink-0" /> {formatPhoneNumber(linkedSupplier?.phone || activeUserContact?.phone || activePhone)}
+                        <Phone className="size-3 text-primary shrink-0" /> {formatPhoneNumber(linkedSupplier?.phone || activeUserContact?.phone || activePhone)}
                       </div>
                       {activeUserContact && (
-                        <div className="text-[10px] font-normal text-muted-foreground truncate min-w-0">
+                        <div className="text-[10px] font-normal text-muted-foreground/70 truncate min-w-0">
                           {activeUserContact.empId} • {activeUserContact.department} • {activeUserContact.role}
                         </div>
                       )}
@@ -968,20 +968,20 @@ export default function WhatsAppInboxView() {
 
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-1.5 py-6">
-                  <Layers className="size-5 text-muted-foreground/30" />
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-2 py-6">
+                  <Layers className="size-6 text-muted-foreground/30" />
                   <div className="space-y-0.5">
-                    <p className="text-[11.5px] font-semibold text-foreground">No Business Context Linked</p>
-                    <p className="text-[10.5px] text-muted-foreground max-w-[200px]">
+                    <p className="text-xs font-semibold text-foreground">No Business Context Linked</p>
+                    <p className="text-[10px] text-muted-foreground max-w-[200px]">
                       Linked Store Requisitions, Purchase Orders, or Daily Procurement requirements will display here.
                     </p>
                   </div>
-                  <div className="flex flex-col gap-1 w-full pt-1">
+                  <div className="flex flex-col gap-1.5 w-full pt-1">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-[10.5px] h-5.5 gap-1 font-medium"
+                      className="text-xs h-7 gap-1 font-medium"
                       onClick={() => setCurrentView('requests')}
                     >
                       Go to Store Requisitions
@@ -990,7 +990,7 @@ export default function WhatsAppInboxView() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="text-[10.5px] h-5.5 gap-1 font-medium"
+                      className="text-xs h-7 gap-1 font-medium"
                       onClick={() => setCurrentView('purchase-order-process')}
                     >
                       Go to Daily Procurement
@@ -1005,14 +1005,14 @@ export default function WhatsAppInboxView() {
               {activePhone && messages.length > 0 ? (
                 <>
                   {/* Assistant Header Context */}
-                  <div className="px-2 py-1 border-b border-border/30 bg-violet-500/5 shrink-0 min-w-0">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <div className="size-4.5 rounded-md bg-violet-500/15 flex items-center justify-center shrink-0">
-                        <Sparkles className="size-2.5 text-violet-500" />
+                  <div className="px-3 py-1.5 border-b border-border/30 bg-violet-500/5 shrink-0 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="size-5 rounded-md bg-violet-500/15 flex items-center justify-center shrink-0">
+                        <Sparkles className="size-3 text-violet-500" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10.5px] font-semibold text-foreground leading-tight truncate">KG Inventra Assistant</div>
-                        <div className="text-[9.5px] text-muted-foreground truncate leading-none font-mono">
+                        <div className="text-xs font-semibold text-foreground leading-tight truncate">KG Inventra Assistant</div>
+                        <div className="text-[10px] text-muted-foreground truncate leading-none font-mono">
                           {activeName} · {formatPhoneNumber(activePhone)}
                         </div>
                       </div>
@@ -1020,9 +1020,9 @@ export default function WhatsAppInboxView() {
                   </div>
 
                   {/* Quick Action Chips */}
-                  <div className="px-1.5 py-1 border-b border-border/30 bg-card/50 shrink-0">
-                    <div className="text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Quick Actions</div>
-                    <div className="flex flex-wrap gap-0.5">
+                  <div className="px-2 py-1.5 border-b border-border/30 bg-card/50 shrink-0">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 mb-1">Quick Actions</div>
+                    <div className="flex flex-wrap gap-1">
                       {[
                         { action: 'summarize' as AssistantAction, label: 'Summarize', icon: FileText },
                         { action: 'draft_reply' as AssistantAction, label: 'Draft Reply', icon: Send },
@@ -1041,9 +1041,9 @@ export default function WhatsAppInboxView() {
                           type="button"
                           disabled={assistantLoading}
                           onClick={() => callAssistant(chip.action)}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-medium border border-violet-500/20 bg-violet-500/5 text-violet-700 dark:text-violet-300 hover:bg-violet-500/15 transition h-[22px] disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border border-violet-500/20 bg-violet-500/5 text-violet-700 dark:text-violet-300 hover:bg-violet-500/15 transition h-6 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          <chip.icon className="size-2.5" />
+                          <chip.icon className="size-3" />
                           {chip.label}
                         </button>
                       ))}
@@ -1056,12 +1056,12 @@ export default function WhatsAppInboxView() {
                     ref={assistantScrollRef}
                   >
                     {assistantMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-1 py-4">
-                        <div className="size-7 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                          <Sparkles className="size-3.5 text-violet-500" />
+                      <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-1.5 py-4">
+                        <div className="size-8 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                          <Sparkles className="size-4 text-violet-500" />
                         </div>
                         <div className="space-y-0.5">
-                          <p className="text-[11.5px] font-semibold text-foreground">AI Assistant Ready</p>
+                          <p className="text-xs font-semibold text-foreground">AI Assistant Ready</p>
                           <p className="text-[10px] text-muted-foreground max-w-[190px]">
                             Use quick actions or type below to analyze this conversation.
                           </p>
@@ -1074,18 +1074,18 @@ export default function WhatsAppInboxView() {
                           className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[88%] rounded-lg p-1.5 text-[11px] leading-[1.35] ${
+                            className={`max-w-[88%] rounded-xl p-2 text-xs leading-snug ${
                               msg.role === 'user'
                                 ? 'bg-violet-500/15 text-violet-900 dark:text-violet-200 rounded-br-none border border-violet-500/20 font-medium'
                                 : 'bg-card border border-border/60 rounded-bl-none text-foreground shadow-2xs'
                             }`}
                           >
                             {msg.role === 'assistant' && (
-                              <div className="flex items-center gap-1 mb-0.5 text-[9.5px] text-violet-600 dark:text-violet-400 font-semibold">
-                                <Sparkles className="size-2.5" />
+                              <div className="flex items-center gap-1 mb-0.5 text-[10px] text-violet-600 dark:text-violet-400 font-semibold">
+                                <Sparkles className="size-3" />
                                 KG Inventra AI
                                 {msg.source && (
-                                  <Badge variant="outline" className="text-[8px] px-1 py-0 border-violet-500/20 text-violet-500 font-mono ml-auto h-3">
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 border-violet-500/20 text-violet-500 font-mono ml-auto h-4">
                                     {msg.source === 'gemini' ? 'AI' : 'Local'}
                                   </Badge>
                                 )}
@@ -1137,7 +1137,7 @@ export default function WhatsAppInboxView() {
                                 </Button>
                               </div>
                             )}
-                            <div className="text-[9px] text-muted-foreground/60 mt-0.5 font-mono">
+                            <div className="text-[10px] text-muted-foreground/50 mt-0.5 font-mono">
                               {format(msg.timestamp, 'HH:mm')}
                             </div>
                           </div>
@@ -1158,8 +1158,8 @@ export default function WhatsAppInboxView() {
                   </div>
 
                   {/* Assistant Query Input */}
-                  <div className="p-1 border-t border-border/40 bg-card shrink-0">
-                    <div className="flex gap-1 items-end">
+                  <div className="p-1.5 border-t border-border/40 bg-card shrink-0">
+                    <div className="flex gap-1.5 items-end">
                       <Input
                         placeholder="Ask about conversation..."
                         value={assistantQuery}
@@ -1170,13 +1170,13 @@ export default function WhatsAppInboxView() {
                             setAssistantQuery('')
                           }
                         }}
-                        className="text-[11.5px] h-[28px] bg-background border-border flex-1 min-w-0"
+                        className="text-xs h-8 bg-background border-border flex-1 min-w-0"
                         disabled={assistantLoading}
                       />
                       <Button
                         type="button"
                         size="sm"
-                        className="h-[28px] px-2 bg-violet-600 hover:bg-violet-700 text-white shadow-2xs shrink-0"
+                        className="h-8 px-2.5 bg-violet-600 hover:bg-violet-700 text-white shadow-xs shrink-0"
                         disabled={assistantLoading || !assistantQuery.trim()}
                         onClick={() => {
                           if (assistantQuery.trim()) {
@@ -1185,17 +1185,17 @@ export default function WhatsAppInboxView() {
                           }
                         }}
                       >
-                        {assistantLoading ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+                        {assistantLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
                       </Button>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-1 p-4">
-                  <div className="size-7 rounded-xl bg-violet-500/10 flex items-center justify-center">
-                    <Sparkles className="size-3.5 text-violet-500/50" />
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground space-y-1.5 p-4">
+                  <div className="size-8 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                    <Sparkles className="size-4 text-violet-500/50" />
                   </div>
-                  <p className="text-[11.5px] font-semibold text-foreground">Select a Conversation</p>
+                  <p className="text-xs font-semibold text-foreground">Select a Conversation</p>
                   <p className="text-[10px] text-muted-foreground max-w-[190px]">
                     Select a conversation from the left panel to use the AI assistant.
                   </p>
