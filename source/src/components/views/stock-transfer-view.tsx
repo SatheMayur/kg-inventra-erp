@@ -40,7 +40,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { api, StockTransferResponse, ItemResponse, PetpoojaPOResponse } from '@/lib/api'
+import { ItemThumb } from '@/components/inventory/item-thumb'
+import { api, StockTransferResponse, ItemResponse } from '@/lib/api'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 
@@ -48,19 +49,11 @@ const LOCATIONS = [
   'Main Store',
   'Warehouse',
   'Cold Storage',
-  'Petpooja Kitchen',
   'Receiving Bay',
   'Production Floor',
 ]
 
-function StatusBadge({ status, reconciled }: { status: string; reconciled: boolean }) {
-  if (reconciled) {
-    return (
-      <Badge variant="outline" className="border-purple-500/20 text-purple-700 bg-purple-500/10 gap-1 text-[10px]">
-        <GitMerge className="size-2.5" /> Reconciled
-      </Badge>
-    )
-  }
+function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'CONFIRMED':
       return (
@@ -74,6 +67,12 @@ function StatusBadge({ status, reconciled }: { status: string; reconciled: boole
           <Clock className="size-2.5" /> Draft
         </Badge>
       )
+    case 'RECONCILED':
+      return (
+        <Badge variant="outline" className="border-emerald-500/20 text-emerald-700 bg-emerald-500/10 gap-1 text-[10px]">
+          <GitMerge className="size-2.5" /> Reconciled
+        </Badge>
+      )
     default:
       return <Badge variant="outline" className="text-[10px]">{status}</Badge>
   }
@@ -81,7 +80,29 @@ function StatusBadge({ status, reconciled }: { status: string; reconciled: boole
 
 const emptyItem = { itemId: '', itemName: '', qty: '', unit: 'pcs', variantId: '', variantName: '' }
 
-export default function StockTransferView() {
+function ItemSelectThumb({ src, alt }: { src: string | null | undefined; alt: string }) {
+  const [error, setError] = useState(false)
+  if (error || !src) {
+    return <span className="size-5 rounded bg-muted/40 inline-block shrink-0" />
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      className="size-5 rounded object-cover shrink-0"
+      onError={() => setError(true)}
+    />
+  )
+}
+
+export default function StockTransferView({
+  title = 'Transfer Memos',
+  description = 'Create and reconcile stock movement memos with Petpooja POs.',
+}: {
+  title?: string
+  description?: string
+}) {
   const [transfers, setTransfers] = useState<StockTransferResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -89,8 +110,9 @@ export default function StockTransferView() {
 
   // Stats derived from loaded data
   const draftCount = transfers.filter((t) => t.status === 'DRAFT').length
-  const pendingReconcileCount = transfers.filter((t) => t.status === 'CONFIRMED' && !t.ppReconciled).length
-  const reconciledCount = transfers.filter((t) => t.ppReconciled).length
+  const pendingReconciliationCount = transfers.filter((t) => t.status === 'CONFIRMED' && !t.ppReconciled).length
+  const reconciledCount = transfers.filter((t) => t.ppReconciled || t.status === 'RECONCILED').length
+
 
   // Create dialog
   const [showCreate, setShowCreate] = useState(false)
@@ -104,16 +126,10 @@ export default function StockTransferView() {
 
   // Confirm state
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [reconcilingId, setReconcilingId] = useState<string | null>(null)
+  const [reconcileTransfer, setReconcileTransfer] = useState<StockTransferResponse | null>(null)
+  const [ppPoReference, setPpPoReference] = useState('')
 
-  // Reconcile dialog
-  const [reconcileTarget, setReconcileTarget] = useState<StockTransferResponse | null>(null)
-  const [ppPoRef, setPpPoRef] = useState('')
-  const [reconciling, setReconciling] = useState(false)
-
-  // Petpooja PO fetch
-  const [ppPOs, setPpPOs] = useState<PetpoojaPOResponse[]>([])
-  const [fetchingPOs, setFetchingPOs] = useState(false)
-  const [ppFetchError, setPpFetchError] = useState('')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -202,38 +218,30 @@ export default function StockTransferView() {
     }
   }
 
-  // ---- Reconcile ----
-  async function handleReconcile() {
-    if (!reconcileTarget || !ppPoRef.trim()) {
-      toast.error('Enter Petpooja PO reference')
-      return
-    }
-    setReconciling(true)
-    try {
-      await api.stockTransfers.reconcile(reconcileTarget.id, ppPoRef.trim())
-      toast.success(`Reconciled with ${ppPoRef.trim()}`)
-      setReconcileTarget(null)
-      setPpPoRef('')
-      fetchData()
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Failed to reconcile')
-    } finally {
-      setReconciling(false)
-    }
+  function openReconcileDialog(transfer: StockTransferResponse) {
+    setReconcileTransfer(transfer)
+    setPpPoReference(transfer.ppPoReference || '')
   }
 
-  async function fetchPPPOs() {
-    setFetchingPOs(true)
-    setPpFetchError('')
-    setPpPOs([])
+  async function handleReconcile() {
+    if (!reconcileTransfer) return
+    const trimmedRef = ppPoReference.trim()
+    if (!trimmedRef) {
+      toast.error('Petpooja PO reference is required')
+      return
+    }
+
+    setReconcilingId(reconcileTransfer.id)
     try {
-      const pos = await api.petpooja.purchaseOrders()
-      setPpPOs(pos)
-      if (pos.length === 0) setPpFetchError('No purchase orders found in Petpooja.')
+      await api.stockTransfers.reconcile(reconcileTransfer.id, { ppPoReference: trimmedRef })
+      toast.success('Transfer reconciled with Petpooja PO')
+      setReconcileTransfer(null)
+      setPpPoReference('')
+      fetchData()
     } catch (err: unknown) {
-      setPpFetchError(err instanceof Error ? err.message : 'Failed to fetch Petpooja POs')
+      toast.error(err instanceof Error ? err.message : 'Failed to reconcile transfer')
     } finally {
-      setFetchingPOs(false)
+      setReconcilingId(null)
     }
   }
 
@@ -245,8 +253,9 @@ export default function StockTransferView() {
       t.toLocation.toLowerCase().includes(search.toLowerCase()) ||
       (t.ppPoReference || '').toLowerCase().includes(search.toLowerCase())
   )
-
-  const pendingReconcile = filteredTransfers.filter((t) => t.status === 'CONFIRMED' && !t.ppReconciled)
+  const pendingReconciliationTransfers = filteredTransfers.filter(
+    (t) => t.status === 'CONFIRMED' && !t.ppReconciled
+  )
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -257,10 +266,8 @@ export default function StockTransferView() {
             <ArrowRightLeft className="size-5" />
             <span className="text-xs font-bold uppercase tracking-[0.2em]">Stock Transfer</span>
           </div>
-          <h2 className="text-4xl font-extrabold tracking-tighter">Transfer Memos</h2>
-          <p className="text-muted-foreground">
-            Create and reconcile stock movement memos with Petpooja POs.
-          </p>
+          <h2 className="text-4xl font-extrabold tracking-tighter">{title}</h2>
+          <p className="text-muted-foreground">{description}</p>
         </div>
         <Button
           className="rounded-xl shadow-lg shadow-primary/20 gap-2"
@@ -285,23 +292,23 @@ export default function StockTransferView() {
         </Card>
         <Card className="border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="size-10 rounded-xl bg-rose-500/15 flex items-center justify-center">
-              <AlertTriangle className="size-5 text-rose-500" />
+            <div className="size-10 rounded-xl bg-sky-500/15 flex items-center justify-center">
+              <RefreshCw className="size-5 text-sky-500" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Pending Reconciliation</p>
-              <p className="text-2xl font-bold">{loading ? '—' : pendingReconcileCount}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Pending Reconcile</p>
+              <p className="text-2xl font-bold">{loading ? '-' : pendingReconciliationCount}</p>
             </div>
           </CardContent>
         </Card>
         <Card className="border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
           <CardContent className="p-5 flex items-center gap-4">
-            <div className="size-10 rounded-xl bg-purple-500/15 flex items-center justify-center">
-              <GitMerge className="size-5 text-purple-500" />
+            <div className="size-10 rounded-xl bg-emerald-500/15 flex items-center justify-center">
+              <GitMerge className="size-5 text-emerald-500" />
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Reconciled</p>
-              <p className="text-2xl font-bold">{loading ? '—' : reconciledCount}</p>
+              <p className="text-2xl font-bold">{loading ? '-' : reconciledCount}</p>
             </div>
           </CardContent>
         </Card>
@@ -324,12 +331,10 @@ export default function StockTransferView() {
           <TabsTrigger value="memos" className="rounded-lg px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm">
             All Memos
           </TabsTrigger>
-          <TabsTrigger value="reconcile" className="rounded-lg px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
-            Pending Reconciliation
-            {pendingReconcileCount > 0 && (
-              <Badge className="bg-rose-500 text-white text-[10px] h-4 px-1.5 rounded-full">
-                {pendingReconcileCount}
-              </Badge>
+          <TabsTrigger value="pending" className="rounded-lg px-6 data-[state=active]:bg-background data-[state=active]:shadow-sm gap-2">
+            Pending Reconcile
+            {pendingReconciliationCount > 0 && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{pendingReconciliationCount}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -393,15 +398,11 @@ export default function StockTransferView() {
                             {t.items.length > 2 ? ` +${t.items.length - 2}` : ''}
                           </p>
                         </TableCell>
-                        <TableCell>
-                          {t.ppPoReference ? (
-                            <span className="font-mono text-[11px] text-primary">{t.ppPoReference}</span>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground italic">—</span>
-                          )}
+                        <TableCell className="font-mono text-[10px] text-muted-foreground">
+                          {t.ppPoReference || '-'}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={t.status} reconciled={t.ppReconciled} />
+                          <StatusBadge status={t.status} />
                         </TableCell>
                         <TableCell className="text-[10px] text-muted-foreground">
                           {format(new Date(t.createdAt), 'dd MMM yyyy')}
@@ -428,13 +429,15 @@ export default function StockTransferView() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-[10px] font-bold uppercase tracking-wider rounded-lg border-purple-500/20 text-purple-700 hover:bg-purple-500/10 gap-1.5"
-                                onClick={() => {
-                                  setReconcileTarget(t)
-                                  setPpPoRef(t.ppPoReference || '')
-                                }}
+                                className="h-7 text-[10px] font-bold uppercase tracking-wider rounded-lg border-sky-500/20 text-sky-700 hover:bg-sky-500/10 gap-1.5"
+                                onClick={() => openReconcileDialog(t)}
+                                disabled={reconcilingId === t.id}
                               >
-                                <ScanBarcode className="size-3" />
+                                {reconcilingId === t.id ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <GitMerge className="size-3" />
+                                )}
                                 Reconcile
                               </Button>
                             )}
@@ -450,15 +453,15 @@ export default function StockTransferView() {
         </TabsContent>
 
         {/* Pending Reconciliation Tab */}
-        <TabsContent value="reconcile" className="mt-0">
+        <TabsContent value="pending" className="mt-0">
           <Card className="border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-muted/20">
                   <TableRow className="hover:bg-transparent border-border/50">
                     <TableHead className="text-[10px] uppercase font-bold tracking-wider">Memo #</TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold tracking-wider">Transfer</TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold tracking-wider">Items Transferred</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold tracking-wider">Movement</TableHead>
+                    <TableHead className="text-[10px] uppercase font-bold tracking-wider">Items</TableHead>
                     <TableHead className="text-[10px] uppercase font-bold tracking-wider">Confirmed On</TableHead>
                     <TableHead className="text-right text-[10px] uppercase font-bold tracking-wider">Action</TableHead>
                   </TableRow>
@@ -467,48 +470,35 @@ export default function StockTransferView() {
                   {loading ? (
                     Array.from({ length: 3 }).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={5} className="h-12 animate-pulse bg-muted/5" />
+                        <TableCell colSpan={5} className="h-14 animate-pulse bg-muted/10" />
                       </TableRow>
                     ))
-                  ) : pendingReconcile.length === 0 ? (
+                  ) : pendingReconciliationTransfers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-40 text-center">
+                      <TableCell colSpan={5} className="h-56 text-center">
                         <div className="flex flex-col items-center justify-center text-muted-foreground gap-2">
-                          <GitMerge className="size-8 opacity-20" />
-                          <p className="text-sm">No pending reconciliations.</p>
-                          <p className="text-xs text-muted-foreground/60">
-                            Confirm a transfer memo to begin reconciliation with Petpooja.
-                          </p>
+                          <CheckCircle2 className="size-10 opacity-20" />
+                          <p className="text-sm">No confirmed transfer memos are waiting for reconciliation.</p>
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    pendingReconcile.map((t) => (
+                    pendingReconciliationTransfers.map((t) => (
                       <TableRow key={t.id} className="border-border/20 hover:bg-primary/5 transition-colors">
                         <TableCell className="font-mono text-xs font-bold">{t.memoNumber}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5 text-xs">
-                            <span>{t.fromLocation}</span>
+                            <span className="font-medium">{t.fromLocation}</span>
                             <ArrowRightLeft className="size-3 text-muted-foreground" />
-                            <span>{t.toLocation}</span>
+                            <span className="font-medium">{t.toLocation}</span>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-0.5">
-                            {t.items.map((item) => (
-                              <div key={item.id} className="flex items-center gap-2 text-[11px]">
-                                <span className="font-medium">{item.itemName}</span>
-                                {item.variantName && (
-                                  <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-muted/30">
-                                    {item.variantName}
-                                  </Badge>
-                                )}
-                                <span className="text-muted-foreground tabular-nums">
-                                  {item.qty} {item.unit}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                          <p className="text-xs font-medium">{t.items.length} items</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {t.items.slice(0, 2).map((i) => i.itemName).join(', ')}
+                            {t.items.length > 2 ? ` +${t.items.length - 2}` : ''}
+                          </p>
                         </TableCell>
                         <TableCell className="text-[10px] text-muted-foreground">
                           {format(new Date(t.updatedAt), 'dd MMM yyyy')}
@@ -516,14 +506,16 @@ export default function StockTransferView() {
                         <TableCell className="text-right">
                           <Button
                             size="sm"
-                            className="h-7 text-[10px] font-bold uppercase tracking-wider rounded-lg gap-1.5 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-                            onClick={() => {
-                              setReconcileTarget(t)
-                              setPpPoRef(t.ppPoReference || '')
-                            }}
+                            className="h-8 rounded-lg gap-1.5"
+                            onClick={() => openReconcileDialog(t)}
+                            disabled={reconcilingId === t.id}
                           >
-                            <ScanBarcode className="size-3" />
-                            Enter PP PO Ref
+                            {reconcilingId === t.id ? (
+                              <Loader2 className="size-3 animate-spin" />
+                            ) : (
+                              <GitMerge className="size-3" />
+                            )}
+                            Reconcile
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -590,6 +582,12 @@ export default function StockTransferView() {
               <div className="space-y-2">
                 {createForm.items.map((row, idx) => (
                   <div key={idx} className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
+                    {/* Photo of the item being moved — visual confirmation */}
+                    <ItemThumb
+                      photoUrl={items.find((i) => i.id === row.itemId)?.photoUrl}
+                      name={row.itemName || 'No item selected'}
+                      size={36}
+                    />
                     <div className="flex-1">
                       <Select
                         value={row.itemId}
@@ -608,7 +606,10 @@ export default function StockTransferView() {
                         <SelectContent>
                           {items.map((i) => (
                             <SelectItem key={i.id} value={i.id}>
-                              {i.name} ({i.stock} {i.unit})
+                              <span className="flex items-center gap-2">
+                                <ItemSelectThumb src={i.photoUrl} alt={i.name} />
+                                {i.name} ({i.stock} {i.unit})
+                              </span>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -677,122 +678,78 @@ export default function StockTransferView() {
         </DialogContent>
       </Dialog>
 
-      {/* Reconcile Dialog */}
-      <Dialog open={!!reconcileTarget} onOpenChange={(o) => { if (!o) { setReconcileTarget(null); setPpPoRef(''); setPpPOs([]); setPpFetchError('') } }}>
+      <Dialog
+        open={!!reconcileTransfer}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReconcileTransfer(null)
+            setPpPoReference('')
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md border-border">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ScanBarcode className="size-5 text-purple-600" /> Reconcile with Petpooja PO
+              <GitMerge className="size-5 text-primary" /> Reconcile Transfer
             </DialogTitle>
             <DialogDescription>
-              Enter the Petpooja PO reference for memo <strong>{reconcileTarget?.memoNumber}</strong>.
-              This links your internal transfer record to Petpooja&apos;s inward entry.
+              Link this confirmed stock transfer with the Petpooja PO reference used at the destination.
             </DialogDescription>
           </DialogHeader>
 
-          {reconcileTarget && (
+          {reconcileTransfer && (
             <div className="space-y-4 py-2">
-              {/* Summary of memo items */}
-              <div className="p-3 rounded-xl bg-muted/15 border border-border/30 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Transferred Items</p>
-                {reconcileTarget.items.map((item) => (
-                  <div key={item.id} className="flex justify-between text-xs">
-                    <span className="font-medium">
-                      {item.itemName}
-                      {item.variantName ? ` (${item.variantName})` : ''}
-                    </span>
-                    <span className="font-mono text-muted-foreground">
-                      {item.qty} {item.unit}
-                    </span>
+              <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-xs font-bold">{reconcileTransfer.memoNumber}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {reconcileTransfer.fromLocation} to {reconcileTransfer.toLocation}
+                    </p>
                   </div>
-                ))}
-                <Separator className="opacity-20" />
-                <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>{reconcileTarget.fromLocation} → {reconcileTarget.toLocation}</span>
-                  <span>{format(new Date(reconcileTarget.createdAt), 'dd MMM yyyy')}</span>
+                  <StatusBadge status={reconcileTransfer.status} />
                 </div>
-              </div>
-
-              {/* Fetch from Petpooja */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
-                    Fetch from Petpooja
-                  </Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-[10px] gap-1.5 rounded-lg"
-                    onClick={fetchPPPOs}
-                    disabled={fetchingPOs}
-                  >
-                    {fetchingPOs ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="size-3" />
-                    )}
-                    {fetchingPOs ? 'Fetching…' : 'Fetch POs'}
-                  </Button>
-                </div>
-                {ppFetchError && (
-                  <p className="text-[10px] text-destructive">{ppFetchError}</p>
-                )}
-                {ppPOs.length > 0 && (
-                  <div className="rounded-xl border border-border/30 overflow-hidden divide-y divide-border/20">
-                    {ppPOs.map((po) => (
-                      <button
-                        key={po.poId}
-                        type="button"
-                        onClick={() => setPpPoRef(po.poNo)}
-                        className={`w-full text-left px-3 py-2 text-xs hover:bg-primary/5 transition-colors flex items-center justify-between gap-2 ${ppPoRef === po.poNo ? 'bg-primary/10 font-semibold' : ''}`}
-                      >
-                        <div>
-                          <span className="font-mono font-bold">{po.poNo}</span>
-                          <span className="text-muted-foreground ml-2">{po.vendorName}</span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-muted-foreground tabular-nums">₹{po.totalAmount.toLocaleString()}</span>
-                          <ExternalLink className="size-3 text-muted-foreground/40" />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
 
               <div className="space-y-2">
                 <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">
                   Petpooja PO Reference *
                 </Label>
-                <Input
-                  placeholder="e.g. PP-2024-001 or scan barcode"
-                  value={ppPoRef}
-                  onChange={(e) => setPpPoRef(e.target.value)}
-                  className="bg-background border-border h-11 font-mono"
-                  autoFocus
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Pick from Petpooja above, scan the barcode, or enter manually.
+                <div className="relative">
+                  <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/50" />
+                  <Input
+                    value={ppPoReference}
+                    onChange={(e) => setPpPoReference(e.target.value)}
+                    placeholder="e.g. PP-PO-2026-001"
+                    className="pl-9 bg-background border-border rounded-xl"
+                    autoFocus
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  After reconciliation, the memo will be locked as reconciled and removed from pending reconciliation.
                 </p>
               </div>
             </div>
           )}
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-4 border-t border-border/10">
             <Button
               variant="ghost"
-              onClick={() => { setReconcileTarget(null); setPpPoRef('') }}
-              disabled={reconciling}
+              onClick={() => {
+                setReconcileTransfer(null)
+                setPpPoReference('')
+              }}
+              disabled={!!reconcilingId}
             >
               Cancel
             </Button>
             <Button
-              className="rounded-xl px-8 bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20 gap-2"
+              className="rounded-xl px-6 gap-2"
               onClick={handleReconcile}
-              disabled={reconciling || !ppPoRef.trim()}
+              disabled={!ppPoReference.trim() || !!reconcilingId}
             >
-              {reconciling ? <Loader2 className="size-4 animate-spin" /> : <GitMerge className="size-4" />}
-              Mark Reconciled
+              {reconcilingId ? <Loader2 className="size-4 animate-spin" /> : <GitMerge className="size-4" />}
+              Reconcile
             </Button>
           </DialogFooter>
         </DialogContent>

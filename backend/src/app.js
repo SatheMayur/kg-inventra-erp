@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const db = require('./config/db');
 
 const authRoutes = require('./routes/auth');
@@ -39,15 +41,29 @@ app.use('/api/inward', inwardRoutes);
 app.use('/api/outward', outwardRoutes);
 app.use('/api/stock-transfers', stockTransfersRoutes);
 app.use('/api/batches', batchesRoutes);
+app.use('/api/invoice-bank', require('./routes/invoice-bank'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/audit-log', require('./routes/audit-log'));
+app.use('/api/invoice-validation', require('./routes/invoice-validation'));
 app.use('/api/normalize', require('./routes/normalize'));
 app.use('/api/locations', require('./routes/locations'));
 app.use('/api/tags', require('./routes/tags'));
 app.use('/api/custom-fields', require('./routes/custom-fields'));
 app.use('/api/system', require('./routes/system'));
 app.use('/api/intelligence', require('./routes/intelligence'));
+
+// Serve the built frontend when available so the app can run from one port.
+const frontendDist = path.join(__dirname, '../../frontend/dist');
+const frontendIndex = path.join(frontendDist, 'index.html');
+if (fs.existsSync(frontendIndex)) {
+  app.use(express.static(frontendDist, { maxAge: '1h', extensions: ['html'] }));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    if (req.path.startsWith('/uploads/')) return next();
+    return res.sendFile(frontendIndex);
+  });
+}
 
 // Global error handler
 app.use((err, req, res, next) => {

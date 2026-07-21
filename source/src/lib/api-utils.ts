@@ -65,3 +65,14 @@ export function handleApiError(error: unknown): NextResponse {
   console.error('[API_ERROR]', error);
   return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
 }
+
+/**
+ * Asserts the request has a valid x-bridge-key header matching the system configuration.
+ */
+export function validateBridgeKey(req: Request): void {
+  const systemBridgeKey = process.env.BRIDGE_API_KEY;
+  const clientBridgeKey = req.headers.get('x-bridge-key');
+  if (!systemBridgeKey || clientBridgeKey !== systemBridgeKey) {
+    throw new ApiError(401, 'Unauthorized: Invalid or missing bridge key', 'UNAUTHORIZED');
+  }
+}

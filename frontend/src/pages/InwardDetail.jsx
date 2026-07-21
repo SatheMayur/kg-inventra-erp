@@ -32,6 +32,7 @@ const S = {
   formGroup: { marginBottom: '14px' },
   label: { display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-2)', marginBottom: '5px' },
   input: { width: '100%', padding: '8px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: '13px', color: 'var(--text-1)', background: 'var(--surface)', boxSizing: 'border-box' },
+  textarea: { width: '100%', minHeight: '180px', padding: '10px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', fontSize: '13px', color: 'var(--text-1)', background: 'var(--surface)', boxSizing: 'border-box', fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace', lineHeight: '1.5', resize: 'vertical' },
   btnRow: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' },
   saveBtn: { padding: '8px 20px', borderRadius: 'var(--radius)', border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
   cancelBtn: { padding: '8px 16px', borderRadius: 'var(--radius)', border: '1px solid var(--border-strong)', background: 'var(--surface)', color: 'var(--text-2)', cursor: 'pointer', fontSize: '13px' },
@@ -54,6 +55,13 @@ function StatusBadge({ status }) {
 }
 
 const emptyLine = { item_id: '', qty: '', rate: '', expiry_date: '' };
+const emptyValidation = {
+  isValid: null,
+  globalInvoiceStatus: '',
+  calculatedSubtotal: 0,
+  mismatchLog: [],
+  lineItems: [],
+};
 
 export default function InwardDetail() {
   const { id } = useParams();
@@ -71,6 +79,57 @@ export default function InwardDetail() {
   const fileInputRef = useRef(null);
   const [importResult, setImportResult] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [ocrText, setOcrText] = useState('');
+  const [claimedGrandTotal, setClaimedGrandTotal] = useState('');
+  const [ocrValidation, setOcrValidation] = useState(emptyValidation);
+  const [ocrValidating, setOcrValidating] = useState(false);
+  const [ocrValidationError, setOcrValidationError] = useState('');
+
+  async function validateOcrInvoice({ silent = false } = {}) {
+    const normalizedText = String(ocrText || '').trim();
+    if (!normalizedText) {
+      setOcrValidation(emptyValidation);
+      setOcrValidationError('');
+      return null;
+    }
+
+    const rawOcrLines = normalizedText
+      .split(/\r?\n+/)
+      .map(line => line.trim())
+      .filter(Boolean);
+
+    if (rawOcrLines.length === 0) {
+      setOcrValidation(emptyValidation);
+      setOcrValidationError('Paste OCR text lines before validating.');
+      return null;
+    }
+
+    setOcrValidating(true);
+    setOcrValidationError('');
+    try {
+      const res = await client.post('/invoice-validation/process', {
+        rawOcrLines,
+        claimedGrandTotal: claimedGrandTotal === '' ? null : claimedGrandTotal,
+        // include optional invoice metadata to help server dedupe
+        invoiceNo: entry?.invoice_no || null,
+        invoiceDate: entry?.invoice_date || null,
+        vendorId: entry?.vendor_id || null,
+      });
+      const data = res.data || emptyValidation;
+      setOcrValidation(data);
+      if (data.invoiceBankId) {
+        setImportResult({ imported: 0, info: `Saved to Invoice Bank (#${data.invoiceBankId})` });
+      }
+      return res.data;
+    } catch (err) {
+      const message = err.response?.data?.error || 'OCR validation failed';
+      setOcrValidationError(message);
+      if (!silent) alert(message);
+      return null;
+    } finally {
+      setOcrValidating(false);
+    }
+  }
 
   async function fetchEntry() {
     try {
@@ -86,6 +145,21 @@ export default function InwardDetail() {
     client.get('/items', { signal: controller.signal }).then(r => setItems(r.data.data || [])).catch(() => {});
     return () => controller.abort();
   }, []);
+  useEffect(() => {
+    const text = String(ocrText || '').trim();
+    if (!text) {
+      setOcrValidation(emptyValidation);
+      setOcrValidationError('');
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      validateOcrInvoice({ silent: true });
+    }, 650);
+
+    return () => clearTimeout(timer);
+    // Validation is intentionally re-run when the raw OCR block or total changes.
+  }, [ocrText, claimedGrandTotal]);
 
   async function handleAddLine() {
     if (!lineForm.item_id || !lineForm.qty || !lineForm.rate) return alert('Item, Qty and Rate are required');
@@ -109,6 +183,16 @@ export default function InwardDetail() {
   }
 
   async function handleConfirm() {
+    if (String(ocrText || '').trim()) {
+      const current = ocrValidation?.globalInvoiceStatus;
+      if (current !== 'READY_FOR_STOCK' && current !== 'WARNING_RETAINED') {
+        const validated = await validateOcrInvoice();
+        if (!validated || validated.globalInvoiceStatus === 'REJECTED_MATH_ERROR') {
+          alert('OCR invoice validation failed. Fix the OCR lines before confirming.');
+          return;
+        }
+      }
+    }
     if (!window.confirm('Confirm this inward entry? This will create batch records.')) return;
     try {
       await client.post(`/inward/${id}/confirm`);
@@ -117,6 +201,13 @@ export default function InwardDetail() {
   }
 
   async function handleLock() {
+    if (String(ocrText || '').trim()) {
+      const current = ocrValidation?.globalInvoiceStatus;
+      if (current === 'REJECTED_MATH_ERROR') {
+        alert('This inward entry has a rejected OCR validation result. Resolve it before locking.');
+        return;
+      }
+    }
     if (!window.confirm('Lock this entry? No further changes will be possible.')) return;
     try {
       await client.post(`/inward/${id}/lock`);
@@ -228,6 +319,69 @@ export default function InwardDetail() {
               )}
             </div>
           )}
+        </div>
+
+        <div style={S.card}>
+          <div style={S.cardHead}>
+            <h3 style={S.cardTitle}>OCR Invoice Validation</h3>
+            <button style={S.addLineBtn} onClick={() => validateOcrInvoice()} disabled={ocrValidating || !String(ocrText || '').trim()}>
+              {ocrValidating ? 'Validating...' : 'Validate Now'}
+            </button>
+          </div>
+          <div style={S.formGroup}>
+            <label style={S.label}>Claimed Grand Total</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              style={S.input}
+              value={claimedGrandTotal}
+              onChange={e => setClaimedGrandTotal(e.target.value)}
+              placeholder="Enter header grand total from invoice"
+            />
+          </div>
+          <div style={S.formGroup}>
+            <label style={S.label}>Raw OCR Text</label>
+            <textarea
+              style={S.textarea}
+              value={ocrText}
+              onChange={e => setOcrText(e.target.value)}
+              placeholder={'Paste OCR lines here.\nExample:\nBox of 24 premium pens 2 100 200'}
+            />
+          </div>
+          <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: '13px' }}>
+            <div style={{ fontWeight: '700', color: 'var(--text-1)' }}>
+              Status: {ocrValidationError
+                ? 'ERROR'
+                : ocrValidation?.globalInvoiceStatus || 'NOT_VALIDATED'}
+            </div>
+            <div style={{ marginTop: '4px', color: 'var(--text-2)' }}>
+              Calculated subtotal: ₹{Number(ocrValidation?.calculatedSubtotal || 0).toFixed(2)}
+            </div>
+            {ocrValidation?.mismatchLog?.length > 0 && (
+              <ul style={{ marginTop: '8px', paddingLeft: '18px', color: 'var(--danger)' }}>
+                {ocrValidation.mismatchLog.map((msg, idx) => <li key={idx}>{msg}</li>)}
+              </ul>
+            )}
+            {ocrValidation?.lineItems?.length > 0 && (
+              <div style={{ marginTop: '10px', display: 'grid', gap: '8px' }}>
+                {ocrValidation.lineItems.map((line, idx) => (
+                  <div key={idx} style={{ padding: '8px 10px', borderRadius: 'var(--radius)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+                      <strong style={{ color: 'var(--text-1)' }}>{line.rawDescription}</strong>
+                      <span style={{ color: line.lineStatus === 'ERROR' ? 'var(--danger)' : line.lineStatus === 'WARNING' ? 'var(--warning)' : 'var(--success)', fontWeight: '700' }}>
+                        {line.lineStatus}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: '4px', color: 'var(--text-2)' }}>
+                      {line.category} · Qty {line.originalQty} → {line.normalizedStockQty} {line.inventoryUnit} · Line ₹{Number(line.calculatedLineTotal || 0).toFixed(2)}
+                    </div>
+                    <div style={{ marginTop: '4px', color: 'var(--text-3)' }}>{line.systemNote}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={S.tableWrap}>

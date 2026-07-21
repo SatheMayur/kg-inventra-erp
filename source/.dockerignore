@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+.git
+.git_combined_backup
+prisma/dev.db
+prisma/dev.db.*
+prisma/prisma
+data
+*.log
+.env
+.env.*
+coverage

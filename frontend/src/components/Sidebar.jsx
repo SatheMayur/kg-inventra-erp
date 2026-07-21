@@ -26,6 +26,17 @@ const sections = [
     ],
   },
   {
+    label: 'STORE MODULE',
+    links: [
+      { label: 'Item Master', path: '/store/item-master', icon: '⌁' },
+      { label: 'Requisition', path: '/store/requisition', icon: '⇄' },
+      { label: 'Purchase Process', path: '/store/purchase-order', icon: '↑' },
+      { label: 'Invoice Entry', path: '/store/purchase-invoice', icon: '⊞' },
+      { label: 'Dept Transfer', path: '/store/transfer-to-department', icon: '↔' },
+      { label: 'Stock Tracking', path: '/store/stock-tracking', icon: '▣' },
+    ],
+  },
+  {
     label: 'TRANSACTIONS',
     links: [
       { label: 'Purchase Orders', path: '/purchase-orders', icon: '↑' },

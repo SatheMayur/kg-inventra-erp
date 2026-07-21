@@ -1,0 +1,31 @@
+KG_INVENTRA - SYSTEM REQUIREMENTS
+VERSION: 2.0 (WHATSAPP INTEGRATION REDESIGN)
+
+1. SYSTEM ARCHITECTURE & INTEGRATION
+REQ-1.01: The system MUST maintain a dedicated Node.js bridge (waha-bridge) polling the Next.js backend every 3 seconds.
+REQ-1.02: The backend MUST expose a stateless `/api/v1/wa/inbound` webhook that does not require JWT authorization to accept inbound messages from the local bridge.
+REQ-1.03: Business logic MUST be abstracted from Next.js API route handlers into reusable service modules to allow execution from both HTTP requests and WhatsApp background jobs.
+
+2. WHATSAPP INBOX UI
+REQ-2.01: The ERP Web UI MUST include a "WhatsApp Inbox" view under the "Operations" navigation tab.
+REQ-2.02: The Inbox UI MUST display a chronological thread of inbound and outbound messages mapped to specific Users or Suppliers.
+REQ-2.03: Admins MUST be able to manually type and queue an outbound message from the Inbox UI.
+
+3. AUTOMATED ALERTS & NOTIFICATIONS
+REQ-3.01: When an Item's physical stock drops below its defined `reorderPoint`, the system MUST queue an outbound WhatsApp alert to all Admin roles.
+REQ-3.02: When a Purchase Order status changes to 'APPROVED', the system MUST automatically queue a message containing the PO details to the Supplier's registered WhatsApp number.
+REQ-3.03: The system MUST track the delivery status of outbound messages (Pending, Sent, Failed) and display this status in the ERP.
+
+4. CONVERSATIONAL WORKFLOWS
+REQ-4.01: The system MUST parse incoming messages to identify specific command patterns (e.g., "STOCK [ItemName]", "APPROVE [ReqID]").
+REQ-4.02: If an Admin replies "APPROVE [ReqID]", the system MUST execute the `ApproveRequisition` business logic exactly as if the Admin clicked approve in the Web UI.
+REQ-4.03: If an Employee texts a stock query, the system MUST query the `ItemMaster` and reply with the current available balance.
+
+5. DATABASE & DATA INTEGRITY
+REQ-5.01: The Prisma schema MUST be updated with a `WhatsAppMessage` model containing fields: `id`, `direction`, `remoteJid`, `content`, `status`, `createdAt`, `relatedEntityId`.
+REQ-5.02: The Prisma schema MUST be updated to include `whatsappNumber` fields on both `User` and `Supplier` models.
+REQ-5.03: All WhatsApp-triggered database mutations MUST run within a Prisma Transaction to ensure stock ledger integrity.
+
+6. SECURITY
+REQ-6.01: The `/api/v1/wa/inbound` route MUST validate requests to ensure they originate only from the trusted local waha-bridge (e.g., via IP whitelisting or a bridge secret key).
+REQ-6.02: Conversational approvals (e.g., "APPROVE [ReqID]") MUST verify that the `remoteJid` (phone number) belongs to an Admin user before executing the action.

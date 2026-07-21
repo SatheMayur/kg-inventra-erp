@@ -32,7 +32,7 @@ export default function NotFound() {
             asChild
             className="w-full sm:w-auto h-12 px-8 rounded-2xl border-border/50 font-bold hover:bg-secondary/50 transition-all gap-2"
           >
-            <Link href="javascript:history.back()">
+            <Link href="/">
               <ArrowLeft className="size-4" />
               Previous View
             </Link>

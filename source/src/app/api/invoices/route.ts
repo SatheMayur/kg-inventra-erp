@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError, ApiError } from '@/lib/api-utils';
+import { INVOICEABLE_STATUSES } from '@/lib/po-status';
 import { z } from 'zod';
 
 const invoiceCreateSchema = z.object({
@@ -23,10 +24,16 @@ export async function GET(request: NextRequest) {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const pageSize = Math.min(1000, Math.max(1, parseInt(searchParams.get('pageSize') || '200')));
+    const skip = (page - 1) * pageSize;
+
     const invoices = await db.purchaseInvoice.findMany({
       include: { purchaseOrder: true },
       orderBy: { createdAt: 'desc' },
-      take: 200,
+      skip,
+      take: pageSize,
     });
     return NextResponse.json(invoices);
   } catch (error) {
@@ -43,6 +50,9 @@ export async function POST(request: NextRequest) {
 
     const po = await db.purchaseOrder.findUnique({ where: { id: data.purchaseOrderId } });
     if (!po) throw new ApiError(404, 'Purchase order not found', 'NOT_FOUND');
+    if (!INVOICEABLE_STATUSES.includes(po.status as any)) {
+      throw new ApiError(400, `Cannot link invoice to a PO in ${po.status} status`, 'BAD_REQUEST');
+    }
 
     const dupe = await db.purchaseInvoice.findUnique({ where: { invoiceNumber: data.invoiceNumber } });
     if (dupe) throw new ApiError(409, 'Invoice number already exists', 'CONFLICT');

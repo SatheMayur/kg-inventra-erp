@@ -6,6 +6,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest --runInBand",
+    "migrate:invoicebank": "node src/db/ensure_invoice_bank.js",
+    "migrate": "knex migrate:latest --knexfile knexfile.js",
     "seed": "node src/db/seed.js"
   },
   "dependencies": {

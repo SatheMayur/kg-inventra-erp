@@ -40,7 +40,7 @@
 
 ## Requirements (concise)
 - **Non-functional:** reports <2s; concurrency-safe transactional stock writes; business-hours availability + backup recovery; scales single→multi-store via Postgres.
-- **Data & integration:** internal DB (items, transactions, requests, users, audit); REST + Slack/Teams webhooks; optional Petpooja PO sync; JSON + XLSX.
+- **Data & integration:** internal DB (items, transactions, requests, users, audit); REST + Slack/Teams webhooks; JSON + XLSX.
 - **Security & compliance:** JWT + role-based access (admin/employee), admin-only on sensitive writes; SSRF protection on outbound URLs; full audit logging; HTTPS; secrets in env vars.
 
 ## Run cost & ROI

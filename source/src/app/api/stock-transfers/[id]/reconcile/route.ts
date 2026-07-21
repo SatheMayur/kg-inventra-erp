@@ -38,6 +38,7 @@ export async function PATCH(
         ppPoReference,
         ppReconciled: true,
         status: 'RECONCILED',
+        notes: `Virtual transit resolved. Receipt confirmed at destination location: ${transfer.toLocation || 'external outlet'}. Stock transfer loop closed.`,
       },
       include: { items: true },
     });

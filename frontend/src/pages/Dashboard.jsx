@@ -671,6 +671,120 @@ const sb = {
     gridTemplateColumns: '1fr 1fr',
     gap: '16px',
   },
+  storeStrip: {
+    background: 'linear-gradient(135deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.94) 50%, rgba(15,23,42,0.96) 100%)',
+    border: '1px solid rgba(245,158,11,0.18)',
+    borderRadius: 'var(--radius-lg)',
+    padding: '18px',
+    marginBottom: '16px',
+    boxShadow: 'var(--shadow-sm)',
+    color: '#fff',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  storeStripGlow: {
+    position: 'absolute',
+    inset: 'auto -80px -80px auto',
+    width: '220px',
+    height: '220px',
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0.03) 55%, transparent 70%)',
+    pointerEvents: 'none',
+  },
+  storeStripTitle: {
+    fontSize: '11px',
+    fontWeight: '700',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'rgba(245,158,11,0.95)',
+    marginBottom: '6px',
+  },
+  storeStripHeading: {
+    fontSize: '20px',
+    fontWeight: '800',
+    lineHeight: '1.2',
+    margin: 0,
+  },
+  storeStripSub: {
+    fontSize: '13px',
+    color: 'rgba(255,255,255,0.62)',
+    marginTop: '6px',
+    maxWidth: '760px',
+  },
+  storePillGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+    gap: '10px',
+    marginTop: '16px',
+  },
+  storePill: {
+    background: 'rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: '14px',
+    padding: '12px 12px 10px',
+    minHeight: '84px',
+  },
+  storePillLabel: {
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    color: 'rgba(255,255,255,0.48)',
+    marginBottom: '8px',
+    fontWeight: '700',
+  },
+  storePillValue: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#fff',
+    lineHeight: '1.2',
+  },
+  lifecycleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+    marginTop: '14px',
+  },
+  lifecycleStep: {
+    padding: '8px 10px',
+    borderRadius: '999px',
+    fontSize: '11px',
+    fontWeight: '700',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    color: 'rgba(255,255,255,0.88)',
+  },
+  lifecycleArrow: {
+    color: 'rgba(245,158,11,0.95)',
+    fontWeight: '900',
+  },
+  quickGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gap: '12px',
+    marginBottom: '16px',
+  },
+  quickCard: {
+    background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+    border: '1px solid rgba(148,163,184,0.24)',
+    borderRadius: '18px',
+    padding: '16px',
+    boxShadow: 'var(--shadow-xs)',
+    cursor: 'pointer',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+  },
+  quickCardTitle: {
+    fontSize: '14px',
+    fontWeight: '800',
+    color: 'var(--text-1)',
+    margin: '0 0 6px',
+  },
+  quickCardSub: {
+    fontSize: '12px',
+    lineHeight: '1.45',
+    color: 'var(--text-3)',
+    margin: 0,
+  },
   // Section cards
   sectionCard: {
     background: 'var(--surface)',
@@ -838,6 +952,14 @@ export default function Dashboard() {
 
   const userName = user?.name ? user.name.split(' ')[0] : 'there';
   const hasData = mis || intel;
+  const storeModules = [
+    { title: 'Store Item Master', sub: 'Create and control items', path: '/store/item-master' },
+    { title: 'Store Requisition', sub: 'Department request workflow', path: '/store/requisition' },
+    { title: 'Purchase Orders', sub: 'Procure stock with approvals', path: '/store/purchase-order' },
+    { title: 'Invoice Entry', sub: 'Capture vendor bills', path: '/store/purchase-invoice' },
+    { title: 'Dept Transfer', sub: 'Move stock to departments', path: '/store/transfer-to-department' },
+    { title: 'Stock Tracking', sub: 'Ledger and running balance', path: '/store/stock-tracking' },
+  ];
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', paddingBottom: '32px' }}>
@@ -881,6 +1003,70 @@ export default function Dashboard() {
       </div>
 
       <div style={sb.content}>
+        <div style={sb.storeStrip}>
+          <div style={sb.storeStripGlow} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={sb.storeStripTitle}>Store Management Module</div>
+            <h2 style={sb.storeStripHeading}>Operational spine for item master, requisition, procurement, receipt, issue, and ledger</h2>
+            <p style={sb.storeStripSub}>
+              Built to surface the full material lifecycle in one place: request, approve, purchase, receive, issue, acknowledge, and audit.
+            </p>
+            <div style={sb.lifecycleRow} aria-label="Store lifecycle">
+              <span style={sb.lifecycleStep}>Item Master</span>
+              <span style={sb.lifecycleArrow}>→</span>
+              <span style={sb.lifecycleStep}>Requisition</span>
+              <span style={sb.lifecycleArrow}>→</span>
+              <span style={sb.lifecycleStep}>Approval</span>
+              <span style={sb.lifecycleArrow}>→</span>
+              <span style={sb.lifecycleStep}>PO / GRN</span>
+              <span style={sb.lifecycleArrow}>→</span>
+              <span style={sb.lifecycleStep}>Issue</span>
+              <span style={sb.lifecycleArrow}>→</span>
+              <span style={sb.lifecycleStep}>Ledger</span>
+            </div>
+            <div style={sb.storePillGrid}>
+              <div style={sb.storePill}>
+                <div style={sb.storePillLabel}>Current State</div>
+                <div style={sb.storePillValue}>Stock, reservations, and alerts in real time</div>
+              </div>
+              <div style={sb.storePill}>
+                <div style={sb.storePillLabel}>Workflow</div>
+                <div style={sb.storePillValue}>Partial issue and multi-level approvals</div>
+              </div>
+              <div style={sb.storePill}>
+                <div style={sb.storePillLabel}>Procurement</div>
+                <div style={sb.storePillValue}>PO, GRN, invoice matching</div>
+              </div>
+              <div style={sb.storePill}>
+                <div style={sb.storePillLabel}>Visibility</div>
+                <div style={sb.storePillValue}>Dashboard, reports, and audit</div>
+              </div>
+              <div style={sb.storePill}>
+                <div style={sb.storePillLabel}>Traceability</div>
+                <div style={sb.storePillValue}>Every movement writes a ledger row</div>
+              </div>
+              <div style={sb.storePill}>
+                <div style={sb.storePillLabel}>Usability</div>
+                <div style={sb.storePillValue}>Large tables, fast search, barcode-first</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={sb.quickGrid}>
+          {storeModules.map((mod) => (
+            <div
+              key={mod.path}
+              style={sb.quickCard}
+              onClick={() => navigate(mod.path)}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 14px 30px rgba(15,23,42,0.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--shadow-xs)'; }}
+            >
+              <h3 style={sb.quickCardTitle}>{mod.title}</h3>
+              <p style={sb.quickCardSub}>{mod.sub}</p>
+            </div>
+          ))}
+        </div>
 
         {error && <ErrorBanner message={error} onRetry={load} />}
 

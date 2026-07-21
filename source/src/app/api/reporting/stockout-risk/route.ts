@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const [items, consumptionGroups] = await Promise.all([
       db.item.findMany({
-        where: { deletedAt: null },
+        where: { deletedAt: null, active: true },
         select: { id: true, name: true, stock: true, reservedQty: true, minStock: true, unit: true },
       }),
       db.transaction.groupBy({
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       .map((item) => {
         const totalConsumed = consumptionMap[item.id] || 0;
         const dailyRate = totalConsumed / 30;
-        const available = item.stock - item.reservedQty;
+        const available = Math.max(0, item.stock - item.reservedQty);
 
         let daysLeft: number | null = null;
         let status: 'critical' | 'warning' | 'ok' | 'insufficient' = 'ok';

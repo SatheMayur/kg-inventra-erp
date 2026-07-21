@@ -26,6 +26,7 @@ import {
 import { api, TransactionResponse } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
 import { toast } from 'sonner'
+import { format } from 'date-fns'
 
 function exportCSV(txns: TransactionResponse[]) {
   const headers = ['ID', 'Type', 'Item', 'Item ID', 'Qty', 'Reference', 'Date']
@@ -36,10 +37,10 @@ function exportCSV(txns: TransactionResponse[]) {
     t.itemId,
     t.qty,
     t.reference,
-    new Date(t.date).toLocaleString(),
+    format(new Date(t.date), 'yyyy-MM-dd HH:mm:ss'),
   ])
   const csv = [headers, ...rows]
-    .map((r) => r.map((c) => `"${c}"`).join(','))
+    .map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
     .join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
@@ -47,10 +48,10 @@ function exportCSV(txns: TransactionResponse[]) {
   a.href = url
   a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
-export default function TransactionsView() {
+export default function TransactionsView({ title }: { title?: string }) {
   const user = useAppStore((s) => s.user)
   const flags = useAppStore((s) => s.flags)
   const isEmployee = user?.role === 'employee'
@@ -108,7 +109,7 @@ export default function TransactionsView() {
         <div className="flex items-center gap-2">
           <ArrowRightLeft className="size-5 text-primary" />
           <h3 className="text-lg font-semibold">
-            {isEmployee ? 'My History' : 'Transaction History'}
+            {title ?? (isEmployee ? 'My History' : 'Transaction History')}
           </h3>
           {!loading && (
             <Badge variant="outline" className="text-xs border-border text-muted-foreground">
@@ -264,14 +265,14 @@ export default function TransactionsView() {
                 </div>
               ))}
             </div>
-          ) : transactions.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <ArrowRightLeft className="mb-3 size-10 opacity-30" />
               <p className="text-sm">No transactions found</p>
               <p className="text-xs opacity-60">Try adjusting your filters</p>
             </div>
           ) : (
-            <ScrollArea className="max-h-[500px]">
+            <div className="max-h-[500px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -320,13 +321,13 @@ export default function TransactionsView() {
                         {t.reference || '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {new Date(t.date).toLocaleString()}
+                        {format(new Date(t.date), 'yyyy-MM-dd HH:mm:ss')}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
       </Card>

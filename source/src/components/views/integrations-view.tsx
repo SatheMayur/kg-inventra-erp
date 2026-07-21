@@ -14,8 +14,17 @@ import {
   XCircle,
   FlaskConical,
   X,
+  Send,
+  Smartphone,
+  Sparkles,
+  Check,
+  CheckCheck,
+  AlertTriangle,
+  Eye,
+  EyeOff,
+  ShieldAlert,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,6 +46,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAppStore } from '@/lib/store'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 
@@ -645,28 +656,708 @@ function WebhooksCard() {
   )
 }
 
+
+// ---- Chat Types ----
+interface ChatMessage {
+  id: string
+  sender: 'user' | 'assistant'
+  text: string
+  timestamp: Date
+  parseData?: any
+}
+
+// ---- WhatsApp AI Simulator Card ----
+
+// ---- WhatsApp AI Simulator Card ----
+
+function WhatsAppSimulatorCard() {
+  const { user } = useAppStore()
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    {
+      id: 'welcome',
+      sender: 'assistant',
+      text: "Hari Om! 🙏 I am the KG Inventra AI Assistant. You can text me in English, Hindi, Gujarati, Hinglish (e.g. 'A4 paper ka stock check karo'), or Gujlish.\n\nTry asking:\n• 'Need 5 blue pens for Accounts'\n• 'A4 paper ka stock kitna hai'\n• 'REQ-cmqm... approve karo'",
+      timestamp: new Date()
+    }
+  ])
+  const [inputText, setInputText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [selectedParse, setSelectedParse] = useState<any>(null)
+  const [creatingReq, setCreatingReq] = useState(false)
+  const [apiKey, setApiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedKey = localStorage.getItem('inventra_gemini_key') || ''
+      setApiKey(savedKey)
+    }
+  }, [])
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault()
+    if (!inputText.trim() || sending) return
+
+    const userText = inputText.trim()
+    const userMsg: ChatMessage = {
+      id: String(Date.now()),
+      sender: 'user',
+      text: userText,
+      timestamp: new Date()
+    }
+
+    setMessages(prev => [...prev, userMsg])
+    setInputText('')
+    setSending(true)
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey.trim()) {
+        headers['x-gemini-key'] = apiKey.trim()
+      }
+
+      const res = await fetch('/api/integrations/whatsapp', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message: userText })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to parse message')
+      }
+
+      const assistantMsg: ChatMessage = {
+        id: String(Date.now() + 1),
+        sender: 'assistant',
+        text: data.suggestedReply,
+        timestamp: new Date(),
+        parseData: data
+      }
+
+      setMessages(prev => [...prev, assistantMsg])
+      setSelectedParse(data)
+    } catch (err: any) {
+      toast.error(err.message || 'Error parsing message')
+      setMessages(prev => [...prev, {
+        id: String(Date.now() + 1),
+        sender: 'assistant',
+        text: `⚠️ Error parsing message: ${err.message || 'Parsing error'}.`,
+        timestamp: new Date()
+      }])
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function confirmRequisition(details: any) {
+    if (creatingReq) return
+    setCreatingReq(true)
+    try {
+      const res = await fetch('/api/requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          lines: [{ itemId: details.itemId, qty: details.quantity }]
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create request')
+
+      toast.success('Requisition created successfully!')
+      setMessages(prev => [...prev, {
+        id: String(Date.now()),
+        sender: 'assistant',
+        text: `✅ Requisition created successfully! Reference ID: REQ-${data.request.id.slice(-6).toUpperCase()} (${data.request.status})`,
+        timestamp: new Date()
+      }])
+      setSelectedParse(null)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create requisition')
+    } finally {
+      setCreatingReq(false)
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in slide-in-from-bottom-3 duration-500">
+      {/* API Key Configuration Banner */}
+      <div className="lg:col-span-12">
+        <Card className="border-border bg-card/60 backdrop-blur-sm shadow-[0_1px_4px_rgba(0,0,0,0.04)] rounded-2xl p-4 border flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className={`size-2 rounded-full ${apiKey ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
+              <h3 className="font-bold text-sm">Gemini AI Configuration</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Optional custom Gemini API key. When omitted, the built-in local Keyword AI Engine handles queries seamlessly.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto md:max-w-md">
+            <div className="relative flex-1">
+              <Input
+                type={showKey ? 'text' : 'password'}
+                placeholder="Optional Gemini API Key (AIzaSy...)"
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value)
+                  localStorage.setItem('inventra_gemini_key', e.target.value)
+                }}
+                className="bg-background border-border h-9 text-xs pr-10 font-mono w-full min-w-[260px]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+            {apiKey ? (
+              <Badge variant="outline" className="text-[10px] border-emerald-500/20 text-emerald-600 bg-emerald-500/10 gap-1 h-9 px-3 rounded-lg shrink-0">
+                <Check className="size-3" /> Gemini AI Active
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-[10px] border-blue-500/20 text-blue-600 bg-blue-500/10 gap-1 h-9 px-3 rounded-lg shrink-0 font-medium">
+                <Sparkles className="size-3" /> Keyword AI Active
+              </Badge>
+            )}
+          </div>
+        </Card>
+      </div>
+
+      {/* Left Col - WhatsApp Chat interface */}
+      <div className="lg:col-span-7 space-y-4">
+        <Card className="border-border/60 bg-card shadow-xl rounded-2xl overflow-hidden flex flex-col h-[580px] border">
+          {/* Header */}
+          <div className="bg-[#075E54] dark:bg-[#128C7E] px-4 py-3 text-white flex items-center gap-3 shrink-0">
+            <div className="size-9 rounded-full bg-emerald-100 flex items-center justify-center text-[#075E54] font-bold text-sm shrink-0">
+              KG
+            </div>
+            <div>
+              <p className="font-semibold text-xs leading-none">KG Inventra Assistant</p>
+              <p className="text-[10px] text-emerald-100/80 mt-1.5 flex items-center gap-1.5 font-medium">
+                <span className="size-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                Online (AI powered)
+              </p>
+            </div>
+          </div>
+
+          {/* Messages List */}
+          <div className="flex-1 p-4 overflow-y-auto bg-[#efeae2] dark:bg-[#0b141a] space-y-3 font-sans flex flex-col">
+            {messages.map((msg) => {
+              const isAssistant = msg.sender === 'assistant'
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col max-w-[80%] ${
+                    isAssistant ? 'self-start mr-auto' : 'self-end ml-auto'
+                  }`}
+                >
+                  <div
+                    className={`p-3 rounded-2xl shadow-sm text-xs whitespace-pre-wrap leading-relaxed select-text cursor-text ${
+                      isAssistant
+                        ? 'bg-white dark:bg-zinc-800 text-foreground rounded-tl-none border border-border/10'
+                        : 'bg-[#DCF8C6] dark:bg-[#056162] text-zinc-900 dark:text-zinc-100 rounded-tr-none border border-emerald-500/10'
+                    }`}
+                  >
+                    {msg.text}
+                    {msg.parseData && (
+                      <div className="mt-2.5 pt-2 border-t border-dashed border-muted-foreground/20 flex items-center justify-between">
+                        <Badge variant="outline" className="text-[9px] bg-background font-mono capitalize px-1 py-0 border-border/40">
+                          {msg.parseData.parse.intent.replace(/_/g, ' ')}
+                        </Badge>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedParse(msg.parseData)}
+                          className="text-[9px] hover:underline text-primary font-semibold"
+                        >
+                          View Debugger
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 mt-1 self-end px-1 select-none">
+                    <span className="text-[9px] text-muted-foreground/60">
+                      {format(msg.timestamp, 'HH:mm')}
+                    </span>
+                    {!isAssistant && (
+                      <CheckCheck className="size-3 text-sky-500 shrink-0" />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {sending && (
+              <div className="self-start mr-auto max-w-[80%] bg-white dark:bg-zinc-800 p-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2 border border-border/10">
+                <Loader2 className="size-3.5 animate-spin text-emerald-500" />
+                <span className="text-[11px] text-muted-foreground">Parsing message...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Input Footer */}
+          <form onSubmit={handleSend} className="p-3 border-t border-border bg-card shrink-0 flex gap-2 items-center">
+            <Input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Type message in Hinglish, Gujarati, or English..."
+              disabled={sending}
+              className="bg-muted/10 border-border h-10 rounded-full px-4 text-xs flex-1"
+            />
+            <Button
+              type="submit"
+              disabled={!inputText.trim() || sending}
+              size="icon"
+              className="rounded-full size-10 shrink-0 bg-[#128C7E] hover:bg-[#075E54] text-white flex items-center justify-center"
+            >
+              <Send className="size-4" />
+            </Button>
+          </form>
+        </Card>
+      </div>
+
+      {/* Right Col - AI Debugger Panel */}
+      <div className="lg:col-span-5 space-y-4">
+        <Card className="border border-border bg-card rounded-2xl overflow-hidden shadow-lg h-[580px] flex flex-col">
+          <div className="border-b border-border/40 bg-muted/20 px-4 py-3 shrink-0 flex items-center gap-2">
+            <Sparkles className="size-4 text-emerald-500" />
+            <p className="font-bold text-xs uppercase tracking-wider">AI Debugger Logs</p>
+          </div>
+
+          <div className="flex-1 p-4 overflow-y-auto space-y-4">
+            {selectedParse ? (
+              <div className="space-y-4 text-xs">
+                {/* Intent & Confidence */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Classified Intent</p>
+                    <Badge className="font-mono text-[10px] bg-primary/10 border border-primary/20 text-primary capitalize px-1.5 py-0.5">
+                      {selectedParse.parse.intent.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/40">
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Confidence Score</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="font-bold font-mono text-[11px]">
+                        {(selectedParse.parse.confidence * 100).toFixed(0)}%
+                      </span>
+                      <div className="flex-1 bg-border rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full bg-emerald-500 rounded-full"
+                          style={{ width: `${selectedParse.parse.confidence * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Languages */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-2.5 rounded-xl bg-muted/20 border border-border/40 text-[11px]">
+                    <span className="text-muted-foreground">Detected Lang:</span>{' '}
+                    <span className="font-semibold capitalize">{selectedParse.parse.language}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-muted/20 border border-border/40 text-[11px]">
+                    <span className="text-muted-foreground">Reply Dialect:</span>{' '}
+                    <span className="font-semibold capitalize">{selectedParse.parse.reply_language}</span>
+                  </div>
+                </div>
+
+                {/* Extracted Entities */}
+                <Card className="border-border/40 bg-muted/10">
+                  <div className="px-3 py-2 bg-muted/30 border-b border-border/30 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Extracted Entities
+                  </div>
+                  <div className="p-3 space-y-2 font-mono text-[11px]">
+                    <div className="flex justify-between py-0.5 border-b border-border/20">
+                      <span className="text-muted-foreground">Item Name:</span>
+                      <span className="font-semibold text-foreground truncate max-w-[180px]">
+                        {selectedParse.parse.item_name || <span className="opacity-30 italic">—</span>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-border/20">
+                      <span className="text-muted-foreground">Raw Alias Used:</span>
+                      <span className="font-semibold text-foreground truncate max-w-[180px]">
+                        {selectedParse.parse.item_alias_used || <span className="opacity-30 italic">—</span>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-border/20">
+                      <span className="text-muted-foreground">Quantity/Unit:</span>
+                      <span className="font-semibold text-foreground">
+                        {selectedParse.parse.quantity !== null && selectedParse.parse.quantity !== undefined ? (
+                          `${selectedParse.parse.quantity} ${selectedParse.parse.unit || 'pcs'}`
+                        ) : (
+                          <span className="opacity-30 italic">—</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-border/20">
+                      <span className="text-muted-foreground">Department:</span>
+                      <span className="font-semibold text-foreground">
+                        {selectedParse.parse.department || <span className="opacity-30 italic">—</span>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-border/20">
+                      <span className="text-muted-foreground">Transaction Ref:</span>
+                      <span className="font-semibold text-foreground">
+                        {selectedParse.parse.transaction_reference || <span className="opacity-30 italic">—</span>}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Database Operations */}
+                <Card className="border-border/40 bg-muted/10">
+                  <div className="px-3 py-2 bg-muted/30 border-b border-border/30 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Database Pipeline Action
+                  </div>
+                  <div className="p-3 space-y-3">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Action Triggered:</span>
+                      <Badge variant="outline" className="border-emerald-500/20 text-emerald-700 bg-emerald-500/5 px-2 py-0.5">
+                        {selectedParse.actionTaken}
+                      </Badge>
+                    </div>
+
+                    {selectedParse.dbDetails && (
+                      <div className="bg-background border border-border/40 rounded-lg p-2.5 space-y-2 font-mono text-[10px]">
+                        {selectedParse.actionTaken.includes('Requisition') && selectedParse.dbDetails.exists !== false ? (
+                          <>
+                            <p className="font-semibold text-primary">Draft Requisition details:</p>
+                            <p>Item: {selectedParse.dbDetails.itemName}</p>
+                            <p>Qty: {selectedParse.dbDetails.quantity} {selectedParse.dbDetails.unit}</p>
+                            <p>Dept: {selectedParse.dbDetails.department}</p>
+                            <Button
+                              onClick={() => confirmRequisition(selectedParse.dbDetails)}
+                              disabled={creatingReq}
+                              className="w-full mt-2 h-8 text-[10px] rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                            >
+                              {creatingReq ? (
+                                <Loader2 className="size-3 animate-spin mr-1.5" />
+                              ) : (
+                                <CheckCircle2 className="size-3.5 mr-1.5" />
+                              )}
+                              Confirm & Create Requisition
+                            </Button>
+                          </>
+                        ) : (
+                          <pre className="whitespace-pre-wrap select-text truncate max-w-full">
+                            {JSON.stringify(selectedParse.dbDetails, null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Warnings / Missing fields */}
+                {selectedParse.parse.missing_fields.length > 0 && (
+                  <div className="p-3 bg-amber-500/5 border border-amber-500/20 text-amber-700 rounded-xl flex items-start gap-2">
+                    <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-[10px] uppercase">Missing Required Parameters</p>
+                      <p className="text-[10px] mt-0.5">
+                        The assistant needs: {selectedParse.parse.missing_fields.join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 pt-20">
+                <Smartphone className="size-12 opacity-20 text-muted-foreground" />
+                <p className="text-sm font-semibold text-center text-foreground/80">No parsed data loaded</p>
+                <p className="text-xs text-center text-muted-foreground/70 max-w-[200px] leading-relaxed">
+                  Send a WhatsApp message on the left simulator to view parsing data details.
+                </p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function WhatsAppConnectionCard() {
+  const [sessionStatus, setSessionStatus] = useState<string>('DISCONNECTED')
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string>('')
+  const [loadingSession, setLoadingSession] = useState(true)
+  const [relinking, setRelinking] = useState(false)
+
+  async function fetchSession() {
+    try {
+      const res = await fetch('/api/whatsapp/session')
+      if (res.ok) {
+        const data = await res.json()
+        setSessionStatus(data.status || 'DISCONNECTED')
+        setQrCodeDataUrl(data.qrDataUrl || null)
+        setStatusMessage(data.message || '')
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingSession(false)
+    }
+  }
+
+  async function handleRelink() {
+    setRelinking(true)
+    try {
+      const res = await fetch('/api/whatsapp/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'RELINK' }),
+      })
+      if (res.ok) {
+        toast.success('Relink command sent to WhatsApp bridge. Generating new QR code...')
+        setQrCodeDataUrl(null)
+        await fetchSession()
+      } else {
+        toast.error('Failed to send relink command')
+      }
+    } catch (err) {
+      toast.error('Error sending relink command')
+    } finally {
+      setRelinking(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSession()
+    const interval = setInterval(fetchSession, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const isPairing = sessionStatus === 'PAIRING_REQUIRED' || (sessionStatus === 'CONNECTING' && Boolean(qrCodeDataUrl))
+  const isStarting = sessionStatus === 'STARTING' || (sessionStatus === 'CONNECTING' && !qrCodeDataUrl)
+
+  return (
+    <Card className="border-border/50 bg-card shadow-lg relative overflow-hidden">
+      <CardHeader className="pb-4 border-b border-border/40 bg-muted/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+              <Smartphone className="size-5" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                WhatsApp Bridge & QR Pairing
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Operational WhatsApp Web bridge session status and device authentication.</p>
+            </div>
+          </div>
+          <Badge
+            variant="outline"
+            className={`capitalize font-bold text-xs px-3 py-1 ${
+              sessionStatus === 'CONNECTED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' :
+              isPairing || isStarting ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' :
+              'bg-rose-500/10 text-rose-600 border-rose-500/30'
+            }`}
+          >
+            <span className={`size-2 rounded-full mr-1.5 inline-block ${
+              sessionStatus === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' :
+              isPairing || isStarting ? 'bg-amber-500 animate-pulse' :
+              'bg-rose-500'
+            }`} />
+            {sessionStatus === 'PAIRING_REQUIRED' ? 'Pairing Required' : sessionStatus.replaceAll('_', ' ').toLowerCase()}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 space-y-6">
+        {sessionStatus === 'CONNECTED' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-3">
+              <CheckCircle2 className="size-5 text-emerald-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Session Linked & Authenticated</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The production WhatsApp bridge is connected. Inbound messages from vendors are recorded automatically, and outbound Daily Procurement requirements send live.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRelink}
+                disabled={relinking}
+                className="text-xs font-semibold text-rose-600 border-rose-500/30 hover:bg-rose-500/10 gap-1.5"
+              >
+                {relinking ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                Disconnect / Reset Session
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isPairing && qrCodeDataUrl && (
+          <div className="flex flex-col items-center justify-center space-y-4 py-2">
+            <div className="space-y-3 text-center">
+              <div className="p-3 bg-white rounded-2xl shadow-xl inline-block border border-border">
+                <img src={qrCodeDataUrl} alt="WhatsApp QR Code" className="size-52 object-contain" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-amber-600 dark:text-amber-400 animate-pulse">
+                  QR Code Ready to Scan
+                </p>
+                <p className="text-[11px] text-muted-foreground max-w-sm">
+                  Open WhatsApp on your phone &gt; Settings &gt; Linked Devices &gt; Link a Device, and scan this QR code.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRelink}
+              disabled={relinking}
+              className="text-xs font-semibold gap-1.5"
+            >
+              {relinking ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Regenerate QR Code
+            </Button>
+          </div>
+        )}
+
+        {isStarting && (
+          <div className="flex flex-col items-center justify-center space-y-4 py-8">
+            <Loader2 className="size-8 animate-spin text-amber-500 mx-auto" />
+            <div className="text-center space-y-1">
+              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 animate-pulse">
+                Initializing WhatsApp Bridge...
+              </p>
+              <p className="text-[11px] text-muted-foreground max-w-xs">
+                {statusMessage || 'Requesting QR code from WhatsApp Web servers...'}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {sessionStatus === 'QR_EXPIRED' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
+              <AlertTriangle className="size-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-amber-700 dark:text-amber-300">QR Code Expired</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The previous QR code has timed out. Click below to generate a new QR code to pair your device.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleRelink}
+              disabled={relinking}
+              className="bg-primary text-primary-foreground font-semibold text-xs gap-1.5 shadow-md shadow-primary/20"
+            >
+              {relinking ? <Loader2 className="size-3.5 animate-spin" /> : <Smartphone className="size-3.5" />}
+              Regenerate QR Code
+            </Button>
+          </div>
+        )}
+
+        {(sessionStatus === 'DISCONNECTED' || sessionStatus === 'ERROR') && (
+          <div className="space-y-4">
+            <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
+              <XCircle className="size-5 text-rose-500 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-rose-700 dark:text-rose-300">
+                  {sessionStatus === 'ERROR' ? 'Bridge Service Error / Offline' : 'Bridge Disconnected'}
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {statusMessage || 'No active WhatsApp account is linked. Click below to start pairing and generate a QR code for authenticating your device.'}
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={handleRelink}
+              disabled={relinking}
+              className="bg-primary text-primary-foreground font-semibold text-xs gap-1.5 shadow-md shadow-primary/20"
+            >
+              {relinking ? <Loader2 className="size-3.5 animate-spin" /> : <Smartphone className="size-3.5" />}
+              Start Pairing & Generate QR
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ---- Main View ----
 
 export default function IntegrationsView() {
+  const { user } = useAppStore()
+  const isAdmin = user?.role === 'admin' || user?.role === 'STORE_ADMIN'
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center space-y-3 animate-in fade-in duration-300">
+        <ShieldAlert className="size-12 text-rose-500/80" />
+        <h2 className="text-lg font-bold text-foreground">Permission Denied</h2>
+        <p className="text-xs text-muted-foreground max-w-sm">
+          You do not have permission to perform this action. Technical configuration, webhooks, and integration settings are restricted to system administrators.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
       <div className="space-y-1">
         <div className="flex items-center gap-2 text-primary mb-1">
           <Link2 className="size-5" />
-          <span className="text-xs font-bold uppercase tracking-[0.2em]">Integrations</span>
+          <span className="text-xs font-bold uppercase tracking-[0.2em]">Integrations & Technical Settings</span>
         </div>
         <h2 className="text-4xl font-extrabold tracking-tighter">Integrations</h2>
-        <p className="text-muted-foreground">Connect Inventra to your tools.</p>
+        <p className="text-muted-foreground">Manage WhatsApp bridge session pairing, webhook channels, and AI test simulators.</p>
       </div>
 
-      {/* 2×2 grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SlackCard />
-        <TeamsCard />
-        <QuickBooksCard />
-        <WebhooksCard />
-      </div>
+      <Tabs defaultValue="whatsapp" className="w-full space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-3 rounded-xl bg-muted/20 p-1 border border-border/40">
+          <TabsTrigger value="whatsapp" className="rounded-lg text-xs font-bold uppercase tracking-wider py-2">
+            WhatsApp Connection
+          </TabsTrigger>
+          <TabsTrigger value="webhooks" className="rounded-lg text-xs font-bold uppercase tracking-wider py-2">
+            Webhooks
+          </TabsTrigger>
+          <TabsTrigger value="simulator" className="rounded-lg text-xs font-bold uppercase tracking-wider py-2">
+            AI Testing
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="whatsapp" className="space-y-6">
+          <WhatsAppConnectionCard />
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="space-y-6">
+          {/* 2×2 grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SlackCard />
+            <TeamsCard />
+            <QuickBooksCard />
+            <WebhooksCard />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="simulator" className="space-y-6">
+          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 flex items-center justify-between text-xs mb-4">
+            <div className="flex items-center gap-2">
+              <FlaskConical className="size-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span><strong>Developer Simulator (Testing Environment):</strong> Messages typed here are evaluated by Gemini & Keyword AI in test mode and are <em>not</em> delivered to real WhatsApp vendors.</span>
+            </div>
+            <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300 text-[10px] uppercase font-mono">
+              Test Mode
+            </Badge>
+          </div>
+          <WhatsAppSimulatorCard />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

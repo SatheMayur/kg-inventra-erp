@@ -1,14 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { AUTH_COOKIE_NAME, authCookieOptions } from '@/lib/auth-cookie';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const response = NextResponse.json({ success: true });
-  // Clear the httpOnly auth cookie
-  response.cookies.set('sh_token', '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  });
+  response.cookies.set(AUTH_COOKIE_NAME, '', authCookieOptions(request, 0));
   return response;
 }

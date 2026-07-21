@@ -4,118 +4,163 @@ import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
 import { createNotification } from '@/lib/notifications';
+import { mutateStock, releaseReservation } from '@/lib/stock';
+import { checkReorder } from '@/lib/reorder';
+import {
+  assertIssuable,
+  assertReadyToIssue,
+  deriveFulfillmentStatus,
+  lineStatusAfterIssue,
+  rollupRequestStatus,
+  flattenRequest,
+} from '@/lib/request-fulfillment';
+import { SR_STATUS, ISSUABLE_STATUSES, LINE_STATUS } from '@/lib/sr-status';
+import { isApproved } from '@/lib/approvals/engine';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await authorize(request, ['admin']);
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN', 'STORE_OPERATOR']);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { id } = await params;
-    const body = await request.json();
-    const { issuedBy, expectedVersion } = body;
+    const body = await request.json().catch(() => ({}));
+    const { issuedBy } = body;
 
     if (!issuedBy) {
       throw new ApiError(400, 'issuedBy is required', 'BAD_REQUEST');
     }
 
+    // Optional partial plan: [{ lineId, qty }]. When omitted, issue every line's
+    // full unissued approved balance (the common "issue whole request" action).
+    const requestedLines: Array<{ lineId: string; qty: number }> | undefined =
+      Array.isArray(body.lines) ? body.lines : undefined;
+
     const result = await db.$transaction(async (tx) => {
-      const req = await tx.request.findUnique({ where: { id } });
+      const req = await tx.request.findUnique({ where: { id }, include: { lines: true } });
       if (!req) throw new ApiError(404, 'Request not found', 'NOT_FOUND');
 
-      if (req.status !== 'Approved') {
-        throw new ApiError(400, 'Only approved requests can be issued', 'BAD_REQUEST');
+      if (!ISSUABLE_STATUSES.includes(req.status)) {
+        throw new ApiError(
+          400,
+          'Only approved, converted-to-PO, ready-for-pickup or partially-issued requests can be issued',
+          'BAD_REQUEST'
+        );
       }
 
-      const item = await tx.item.findUnique({ where: { id: req.itemId } });
-      if (!item || item.deletedAt) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
-
-      // Optimistic concurrency check
-      if (expectedVersion !== undefined && item.version !== expectedVersion) {
-        throw new ApiError(409, 'Item has been modified since the request was made', 'CONFLICT');
+      const approved = (
+        req.status === SR_STATUS.APPROVED ||
+        req.status === SR_STATUS.CONVERTED_TO_PO ||
+        req.status === SR_STATUS.READY_FOR_PICKUP ||
+        req.status === SR_STATUS.PARTIALLY_ISSUED ||
+        req.status === SR_STATUS.STOCK_AVAILABLE ||
+        req.status === SR_STATUS.ISSUE_PENDING
+      ) || (await isApproved('STORE_REQUISITION', id));
+      if (!approved) {
+        throw new ApiError(400, 'Requisition is not approved', 'BAD_REQUEST');
       }
 
-      if (item.stock < req.qty) {
-        throw new ApiError(409, `Insufficient stock. Current stock: ${item.stock}`, 'CONFLICT');
-      }
+      const plan =
+        requestedLines && requestedLines.length > 0
+          ? requestedLines
+          : req.lines
+              .filter((l) => l.status !== LINE_STATUS.REJECTED && l.status !== LINE_STATUS.CANCELLED && l.approvedQty - l.issuedQty > 0)
+              .map((l) => ({ lineId: l.id, qty: l.approvedQty - l.issuedQty }));
 
-      // Decrement stock, release reservation, increment version
-      const updatedItem = await tx.item.update({
-        where: { 
-          id: req.itemId,
-          version: expectedVersion ?? item.version // Enforce version match if provided
-        },
-        data: {
-          stock: { decrement: req.qty },
-          reservedQty: { decrement: req.qty },
-          version: { increment: 1 },
-        },
+      if (plan.length === 0) throw new ApiError(400, 'Nothing to issue', 'BAD_REQUEST');
+
+      const openPo = await tx.purchaseOrder.findFirst({
+        where: { linkedSrId: id, status: { notIn: ['CANCELLED', 'REJECTED', 'CLOSED'] } },
+        select: { id: true },
       });
+      const hasOpenPo = !!openPo;
 
-      // Create OUT transaction
-      await tx.transaction.create({
-        data: {
-          type: 'OUT',
-          itemId: req.itemId,
-          itemName: item.name,
-          qty: req.qty,
+      let lastItem = null as Awaited<ReturnType<typeof mutateStock>>['after'] | null;
+
+      for (const p of plan) {
+        const line = req.lines.find((l) => l.id === p.lineId);
+        if (!line) throw new ApiError(404, `Request line not found: ${p.lineId}`, 'NOT_FOUND');
+
+        try {
+          assertIssuable(line.approvedQty, line.issuedQty, p.qty);
+        } catch (e) {
+          throw new ApiError(400, (e as Error).message, 'BAD_REQUEST');
+        }
+
+        try {
+          assertReadyToIssue(line.availableQty || 0, line.issuedQty, p.qty);
+        } catch (e) {
+          throw new ApiError(400, (e as Error).message, 'BAD_REQUEST');
+        }
+
+        // mutateStock validates stock/existence, decrements, bumps version and
+        // writes the ISSUE ledger row (single source of truth).
+        const { after } = await mutateStock(tx, {
+          itemId: line.itemId,
+          delta: -p.qty,
           reference: `Request ${req.id}`,
           userId: req.userId,
-        },
-      });
+          subType: 'ISSUE',
+        });
+        lastItem = after;
 
-      const updatedRequest = await tx.request.update({
+        const remainingReservation = Math.max(0, Math.min(line.approvedQty, line.availableQty || 0) - line.issuedQty);
+        const reservationRelease = Math.min(p.qty, remainingReservation);
+        if (reservationRelease > 0) {
+          await releaseReservation(tx, line.itemId, reservationRelease);
+        }
+
+        const newIssued = line.issuedQty + p.qty;
+        await tx.requestLine.update({
+          where: { id: line.id },
+          data: {
+            issuedQty: newIssued,
+            status: lineStatusAfterIssue(line.approvedQty, newIssued),
+            fulfillmentStatus: deriveFulfillmentStatus({ ...line, issuedQty: newIssued }, hasOpenPo),
+          },
+        });
+
+        // Auto-create a reorder PO if this issue dropped the item to its threshold.
+        await checkReorder(tx, line.itemId);
+      }
+
+      const fresh = await tx.requestLine.findMany({ where: { requestId: id } });
+      const headerStatus = rollupRequestStatus(fresh);
+
+      const updated = await tx.request.update({
         where: { id },
         data: {
-          status: 'Issued',
-          issuedAt: new Date(),
-          issuedBy,
+          status: headerStatus,
+          issuedAt: headerStatus === SR_STATUS.ISSUED ? new Date() : req.issuedAt,
+          issuedBy: headerStatus === SR_STATUS.ISSUED ? issuedBy : req.issuedBy,
         },
+        include: { lines: true },
       });
 
-      return { request: updatedRequest, item: updatedItem };
+      return { request: updated, item: lastItem };
     });
 
-    // Audit Log
+    const flat = flattenRequest(result.request);
+
     await createAuditLog({
       action: 'ISSUE_REQUEST',
       user: auth.user,
       targetId: id,
-      targetName: result.request.itemName,
-      metadata: { qty: result.request.qty, employee: result.request.employee }
+      targetName: flat.itemName,
+      metadata: { status: result.request.status, employee: result.request.employee },
     });
 
     await createNotification({
       userId: result.request.userId,
-      title: 'Item Issued',
-      message: `Your requested item "${result.request.itemName}" has been officially issued.`,
+      title: result.request.status === SR_STATUS.ISSUED ? 'Items Issued' : 'Items Partially Issued',
+      message: `Your request "${flat.itemName}" has been ${result.request.status === SR_STATUS.ISSUED ? 'fully' : 'partially'} issued.`,
       type: 'info',
       link: 'requests',
     });
 
-    // Notify all admins if stock dropped to or below minStock
-    const available = result.item.stock - result.item.reservedQty;
-    if (available <= result.item.minStock) {
-      const admins = await db.user.findMany({
-        where: { role: 'admin', active: true },
-        select: { id: true },
-      });
-      await Promise.all(
-        admins.map((admin) =>
-          createNotification({
-            userId: admin.id,
-            title: available === 0 ? 'Out of Stock' : 'Low Stock Alert',
-            message: `"${result.item.name}" is ${available === 0 ? 'out of stock' : `low (${available} remaining)`}. Reorder recommended.`,
-            type: available === 0 ? 'error' : 'warning',
-            link: 'inventory',
-          })
-        )
-      );
-    }
-
-    return NextResponse.json({ request: result.request, item: result.item });
+    return NextResponse.json({ request: flat, item: result.item });
   } catch (error) {
     return handleApiError(error);
   }

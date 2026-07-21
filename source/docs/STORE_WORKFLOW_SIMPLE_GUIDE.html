@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>KG Store Simple Workflow Guide</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #172033;
+      background: #ffffff;
+      font-size: 11.5px;
+      line-height: 1.35;
+    }
+
+    .page {
+      width: 100%;
+    }
+
+    .header {
+      border-bottom: 2px solid #172033;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: #526070;
+      font-size: 12px;
+    }
+
+    h2 {
+      margin: 12px 0 6px;
+      font-size: 14px;
+      color: #0f5d5e;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin: 3px 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .box {
+      border: 1px solid #d7dde6;
+      border-radius: 6px;
+      padding: 9px 10px;
+      break-inside: avoid;
+      background: #fbfcfe;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .steps li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 7px;
+      align-items: start;
+      margin: 5px 0;
+    }
+
+    .steps li::before {
+      content: counter(step);
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #0f5d5e;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 11px;
+      line-height: 20px;
+      text-align: center;
+    }
+
+    .tag {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-right: 4px;
+      border: 1px solid transparent;
+    }
+
+    .green { background: #e8f8ef; color: #126038; border-color: #bfe9d0; }
+    .amber { background: #fff4df; color: #895400; border-color: #f4d295; }
+    .blue { background: #eaf3ff; color: #174d86; border-color: #c5daf7; }
+    .gray { background: #eef1f5; color: #455161; border-color: #d8dee7; }
+
+    .footer {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #d7dde6;
+      color: #526070;
+      font-size: 10.5px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="header">
+      <h1>KG Store Simple Workflow Guide</h1>
+      <p class="subtitle">One-page guide for request, purchase order, receiving, and issue flow</p>
+    </section>
+
+    <section class="grid">
+      <div class="box full">
+        <h2>Main Flow</h2>
+        <ol class="steps">
+          <li><strong>Employee creates request:</strong> Add item, quantity, department, purpose, and priority.</li>
+          <li><strong>Department head approves:</strong> Request moves forward only after approval.</li>
+          <li><strong>Store checks stock:</strong> If stock is available, it is reserved for the request.</li>
+          <li><strong>Shortage goes to PO:</strong> Purchase order is created only for shortage quantity.</li>
+          <li><strong>Store receives PO items:</strong> Received stock is added and reserved back to the original request.</li>
+          <li><strong>Store issues material:</strong> Ready quantity is issued to the employee and request is closed when complete.</li>
+        </ol>
+      </div>
+
+      <div class="box">
+        <h2>What Each Status Means</h2>
+        <ul>
+          <li><span class="tag amber">Pending</span>Waiting for approval.</li>
+          <li><span class="tag blue">Approved</span>Store can issue if stock is ready.</li>
+          <li><span class="tag amber">Converted to PO</span>Purchase order created for shortage.</li>
+          <li><span class="tag green">Ready for Issue</span>Stock is reserved and can be issued.</li>
+          <li><span class="tag gray">Issued</span>Material has been given to employee.</li>
+        </ul>
+      </div>
+
+      <div class="box">
+        <h2>Who Does What</h2>
+        <ul>
+          <li><strong>Employee:</strong> Create request and track status.</li>
+          <li><strong>Department Head:</strong> Approve or reject request.</li>
+          <li><strong>Store Admin / Operator:</strong> Check stock, receive goods, issue items.</li>
+          <li><strong>Purchase User:</strong> Create and follow up purchase orders.</li>
+          <li><strong>Accounts:</strong> Check invoice and GST totals.</li>
+        </ul>
+      </div>
+
+      <div class="box">
+        <h2>Next Action Guide</h2>
+        <ul>
+          <li><strong>Approve Request:</strong> Department head must approve first.</li>
+          <li><strong>Create PO:</strong> Stock shortage exists and purchase is required.</li>
+          <li><strong>Receive PO Stock:</strong> PO is created, waiting for items to arrive.</li>
+          <li><strong>Proceed to Issue:</strong> Stock is reserved and ready for employee.</li>
+          <li><strong>Completed:</strong> All approved items are issued.</li>
+        </ul>
+      </div>
+
+      <div class="box">
+        <h2>Important Rules</h2>
+        <ul>
+          <li>Do not issue more than reserved and ready quantity.</li>
+          <li>Create PO only for shortage quantity, not full requested quantity.</li>
+          <li>After PO receipt, check the original request for ready-to-issue status.</li>
+          <li>Add transportation cost, CGST, SGST, and IGST in PO before final save.</li>
+          <li>Use invoice matching before closing the purchase cycle.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="footer">
+      <span>KG Store Workflow Guide</span>
+      <span>Use this as a quick reference for daily store operations.</span>
+    </section>
+  </main>
+</body>
+</html>

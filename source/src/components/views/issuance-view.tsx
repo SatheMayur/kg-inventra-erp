@@ -44,18 +44,32 @@ import { toast } from 'sonner'
 type Status = RequestResponse['status']
 
 function statusBadge(status: Status) {
-  const map: Record<Status, string> = {
-    Pending: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
-    Approved: 'bg-sky-500/10 text-sky-700 border-sky-500/20',
-    Issued: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-    Rejected: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
-    Cancelled: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
+  const normalized = status.toUpperCase().replace(/\s+/g, '_')
+  const map: Record<string, string> = {
+    PENDING: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
+    APPROVED: 'bg-sky-500/10 text-sky-700 border-sky-500/20',
+    PARTIALLYISSUED: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/20',
+    READYFORPICKUP: 'bg-violet-500/10 text-violet-700 border-violet-500/20',
+    CONVERTED_TO_PO: 'bg-pink-500/10 text-pink-700 border-pink-500/20',
+    ISSUED: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+    REJECTED: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
+    CANCELLED: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
+  }
+  // Display-only label mapping; the stored status value is unchanged.
+  const labels: Record<string, string> = {
+    ISSUED: 'Completed',
+    PARTIALLYISSUED: 'Partially Issued',
+    CONVERTED_TO_PO: 'Converted to PO',
   }
   return (
-    <Badge variant="outline" className={`text-xs ${map[status]}`}>
-      {status}
+    <Badge variant="outline" className={`text-xs ${map[normalized] ?? 'bg-muted/50 text-muted-foreground border-muted-foreground/20'}`}>
+      {labels[normalized] ?? status}
     </Badge>
   )
+}
+
+function isIssuableStatus(status: string) {
+  return ['Approved', 'ReadyForPickup', 'PartiallyIssued', 'CONVERTED_TO_PO'].includes(status)
 }
 
 function formatDate(d: string | null) {
@@ -91,6 +105,29 @@ export default function IssuanceView() {
 
   // Issue confirmation dialog
   const [issueReq, setIssueReq] = useState<RequestResponse | null>(null)
+  const [issueLines, setIssueLines] = useState<Record<string, string>>({})
+
+  // Initialize issue lines map when the request changes
+  useEffect(() => {
+    if (!issueReq) {
+      setIssueLines({})
+      return
+    }
+    const initial: Record<string, string> = {}
+    if (issueReq.lines && issueReq.lines.length > 0) {
+      issueReq.lines.forEach((l) => {
+        if (l.status === 'Approved' || l.status === 'PartiallyIssued') {
+          const readyQty = getLineReadyQty(l)
+          if (readyQty > 0) {
+            initial[l.id] = String(readyQty)
+          }
+        }
+      })
+    } else {
+      initial['legacy'] = String(issueReq.qty)
+    }
+    setIssueLines(initial)
+  }, [issueReq])
 
    // Conflict dialog
   const [conflictInfo, setConflictInfo] = useState<{
@@ -107,15 +144,23 @@ export default function IssuanceView() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      // Fetch both Pending and Approved requests
-      const [pending, approved] = await Promise.all([
+      // Fetch workflow statuses that can still need store action.
+      const [pending, approved, converted, partial, ready] = await Promise.all([
         api.requests.list({ status: 'Pending' }),
         api.requests.list({ status: 'Approved' }),
+        api.requests.list({ status: 'CONVERTED_TO_PO' }),
+        api.requests.list({ status: 'PartiallyIssued' }),
+        api.requests.list({ status: 'ReadyForPickup' }),
       ])
-      // Sort: Pending first, then Approved; within each, newest first
+      // Sort by workflow stage; within each, newest first.
+      const byNewest = (a: RequestResponse, b: RequestResponse) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       const sorted = [
-        ...pending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-        ...approved.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        ...[...pending].sort(byNewest),
+        ...[...approved].sort(byNewest),
+        ...[...converted].sort(byNewest),
+        ...[...partial].sort(byNewest),
+        ...[...ready].sort(byNewest),
       ]
       setRequests(sorted)
     } catch {
@@ -156,17 +201,47 @@ export default function IssuanceView() {
 
   // ── Helpers ─────────────────────────────────────────────
 
-  function getItemForRequest(req: RequestResponse): ItemResponse | undefined {
-    return items.find((i) => i.id === req.itemId)
+  function getLineItem(itemId: string): ItemResponse | undefined {
+    return items.find((i) => i.id === itemId)
   }
 
-  function getAvailable(req: RequestResponse): number {
-    const item = getItemForRequest(req)
+  function getLineAvailable(itemId: string, requestedQty: number): number {
+    const item = getLineItem(itemId)
     if (!item) return 0
-    // The request already has its quantity reserved in item.reservedQty.
-    // To see if we can fulfill THIS request, we look at:
-    // Total Stock - (Total Reserved - This Request's Portion)
-    return item.stock - (item.reservedQty - req.qty)
+    // Total stock - (Total reserved - Current request's reservation portion)
+    return item.stock - (item.reservedQty - requestedQty)
+  }
+
+  function getLineReadyQty(line: RequestResponse['lines'][number]): number {
+    const remaining = Math.max(0, line.approvedQty - line.issuedQty)
+    const reservedReady = Math.max(0, (line.availableQty ?? 0) - line.issuedQty)
+    return Math.min(remaining, reservedReady)
+  }
+
+  function getRequestReadyQty(req: RequestResponse): number {
+    if (req.lines && req.lines.length > 0) {
+      return req.lines.reduce((sum, line) => sum + getLineReadyQty(line), 0)
+    }
+    return Math.max(0, getLineAvailable(req.itemId, req.qty))
+  }
+
+  function hasIssuableQty(req: RequestResponse): boolean {
+    return getRequestReadyQty(req) > 0
+  }
+
+  function isRequestSufficient(req: RequestResponse): boolean {
+    if (req.lines && req.lines.length > 0) {
+      return req.lines.every((line) => {
+        if (line.status === 'Rejected' || line.status === 'Cancelled') return true
+        const remaining = line.approvedQty - line.issuedQty
+        if (remaining <= 0) return true
+        return getLineReadyQty(line) >= remaining
+      })
+    }
+    // Legacy fallback
+    const item = items.find((i) => i.id === req.itemId)
+    if (!item) return false
+    return item.stock - (item.reservedQty - req.qty) >= req.qty
   }
 
   // ── Action handlers ─────────────────────────────────────
@@ -181,6 +256,20 @@ export default function IssuanceView() {
       await refreshPendingBadge()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to approve')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleReady(id: string) {
+    setActionLoading(id)
+    try {
+      await api.requests.markReady(id)
+      toast.success('Marked ready for pickup')
+      await fetchRequests()
+      await refreshPendingBadge()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to mark ready')
     } finally {
       setActionLoading(null)
     }
@@ -203,34 +292,72 @@ export default function IssuanceView() {
 
   async function handleIssue() {
     if (!issueReq || !user) return
-    const item = getItemForRequest(issueReq)
-    if (!item) {
-      toast.error('Item not found')
-      return
+
+    const linesToIssue: Array<{ lineId: string; qty: number }> = []
+
+    if (issueReq.lines && issueReq.lines.length > 0) {
+      // Validate inputs
+      for (const line of issueReq.lines) {
+        const val = issueLines[line.id]
+        if (val) {
+          const qty = parseInt(val, 10)
+          if (isNaN(qty) || qty < 0) {
+            toast.error(`Invalid quantity for line: ${line.itemName}`)
+            return
+          }
+          if (qty > 0) {
+            const maxAllowed = line.approvedQty - line.issuedQty
+            if (qty > maxAllowed) {
+              toast.error(`Cannot issue more than approved remaining (${maxAllowed}) for ${line.itemName}`)
+              return
+            }
+            const avail = getLineReadyQty(line)
+            if (qty > avail) {
+              toast.error(`Insufficient stock for ${line.itemName}. Max available: ${avail}`)
+              return
+            }
+            linesToIssue.push({ lineId: line.id, qty })
+          }
+        }
+      }
+
+      if (linesToIssue.length === 0) {
+        toast.error('Please enter a quantity greater than zero for at least one item')
+        return
+      }
+    } else {
+      // Legacy fallback
+      const item = items.find((i) => i.id === issueReq.itemId)
+      if (!item) {
+        toast.error('Item not found')
+        return
+      }
+      const avail = item.stock - (item.reservedQty - issueReq.qty)
+      if (issueReq.qty > avail) {
+        toast.error('Insufficient stock')
+        return
+      }
     }
 
     setActionLoading(issueReq.id)
     try {
-      await api.requests.issue(issueReq.id, item.version, user.name, user.id)
+      if (issueReq.lines && issueReq.lines.length > 0) {
+        await api.requests.issue(issueReq.id, {
+          issuedBy: user.name,
+          lines: linesToIssue,
+        })
+      } else {
+        await api.requests.issue(issueReq.id, {
+          issuedBy: user.name,
+        })
+      }
       toast.success('Item issued successfully')
       setIssueReq(null)
       await fetchRequests()
       await fetchItems()
       await refreshPendingBadge()
     } catch (err: unknown) {
-      const errAny = err as Record<string, unknown>
-      if (errAny.type === 'CONFLICT') {
-        // Version mismatch
-        setIssueReq(null)
-        const serverData = errAny.data as Record<string, unknown> | undefined
-        setConflictInfo({
-          req: issueReq,
-          serverVersion: (serverData?.currentVersion as number) ?? item.version + 1,
-          expectedVersion: item.version,
-        })
-      } else {
-        toast.error(err instanceof Error ? err.message : 'Failed to issue')
-      }
+      toast.error(err instanceof Error ? err.message : 'Failed to issue request')
     } finally {
       setActionLoading(null)
     }
@@ -246,7 +373,7 @@ export default function IssuanceView() {
   async function handleIssueAllApproved() {
     if (!user) return
     const approvedWithStock = requests.filter(
-      (r) => r.status === 'Approved' && getAvailable(r) >= r.qty
+      (r) => isIssuableStatus(r.status) && isRequestSufficient(r)
     )
     if (approvedWithStock.length === 0) {
       toast.info('No approved requests with sufficient stock')
@@ -258,20 +385,11 @@ export default function IssuanceView() {
     let failed = 0
 
     for (const req of approvedWithStock) {
-      const item = getItemForRequest(req)
-      if (!item) { failed++; continue }
       try {
-        await api.requests.issue(req.id, item.version, user.name, user.id)
+        await api.requests.issue(req.id, { issuedBy: user.name })
         issued++
-        // Optimistically remove from local list so available stock updates between iterations
+        // Optimistically remove from local list
         setRequests((prev) => prev.filter((r) => r.id !== req.id))
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === item.id
-              ? { ...i, stock: i.stock - req.qty, reservedQty: i.reservedQty - req.qty, version: i.version + 1 }
-              : i
-          )
-        )
       } catch {
         failed++
       }
@@ -285,7 +403,7 @@ export default function IssuanceView() {
     if (failed === 0) {
       toast.success(`Issued ${issued} request${issued !== 1 ? 's' : ''} successfully`)
     } else {
-      toast.warning(`Issued ${issued}, failed ${failed} (version conflicts or stock changes)`)
+      toast.warning(`Issued ${issued}, failed ${failed}`)
     }
   }
 
@@ -304,9 +422,7 @@ export default function IssuanceView() {
 
   // ── Issue dialog data ────────────────────────────────────
 
-  const issueItem = issueReq ? getItemForRequest(issueReq) : null
-  const issueAvailable = issueItem ? issueItem.stock - (issueItem.reservedQty - issueReq!.qty) : 0
-  const stockAfterIssue = (issueItem?.stock ?? 0) - (issueReq?.qty ?? 0)
+  const issueItem = issueReq ? getLineItem(issueReq.itemId) : null
 
   // ── Render ───────────────────────────────────────────────
 
@@ -322,7 +438,7 @@ export default function IssuanceView() {
           <Badge variant="outline" className="text-xs border-border text-muted-foreground">
             {requests.length} pending
           </Badge>
-          {requests.some((r) => r.status === 'Approved' && getAvailable(r) >= r.qty) && (
+          {requests.some((r) => isIssuableStatus(r.status) && isRequestSufficient(r)) && (
             <Button
               size="sm"
               className="gap-1.5 bg-emerald-600 hover:bg-emerald-500/100 text-white"
@@ -399,9 +515,13 @@ export default function IssuanceView() {
               </TableHeader>
               <TableBody>
                 {filtered.map((req) => {
-                  const available = getAvailable(req)
-                  const sufficient = available >= req.qty
+                  const available = req.lines && req.lines.length > 1
+                    ? '—'
+                    : getLineAvailable(req.itemId, req.qty)
                   const isLoading = actionLoading === req.id
+                  const readyQty = getRequestReadyQty(req)
+                  const hasReadyQty = hasIssuableQty(req)
+                  const displayAvailable = req.lines && req.lines.length > 0 ? `${readyQty} ready` : `${available}`
 
                   return (
                     <TableRow
@@ -418,11 +538,11 @@ export default function IssuanceView() {
                       <TableCell>
                         <span
                           className={`text-sm font-medium ${
-                            sufficient ? 'text-emerald-700' : 'text-rose-700'
+                            hasReadyQty ? 'text-emerald-700' : 'text-rose-700'
                           }`}
                         >
-                          {available}
-                          {!sufficient && (
+                          {displayAvailable}
+                          {!hasReadyQty && (
                             <AlertTriangle className="inline size-3 ml-1 -mt-0.5" />
                           )}
                         </span>
@@ -465,12 +585,23 @@ export default function IssuanceView() {
                               </Button>
                             </>
                           )}
-                          {req.status === 'Approved' && (
+                          {isIssuableStatus(req.status) && (
                             <>
+                              {req.status === 'Approved' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2.5 gap-1"
+                                  disabled={!!actionLoading}
+                                  onClick={() => handleReady(req.id)}
+                                >
+                                  <span className="hidden sm:inline">Mark ready</span>
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 className="h-7 px-2.5 gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                                disabled={!!actionLoading || !sufficient}
+                                disabled={!!actionLoading || !hasReadyQty}
                                 onClick={() => setIssueReq(req)}
                               >
                                 {isLoading ? (
@@ -480,20 +611,22 @@ export default function IssuanceView() {
                                 )}
                                 <span className="hidden sm:inline">Issue</span>
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 gap-1 text-rose-700 hover:text-rose-800 hover:bg-rose-500/10"
-                                disabled={!!actionLoading}
-                                onClick={() => handleReject(req.id)}
-                              >
-                                {isLoading ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  <X className="size-3.5" />
-                                )}
-                                <span className="hidden sm:inline">Reject</span>
-                              </Button>
+                              {req.status === 'Approved' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 gap-1 text-rose-700 hover:text-rose-800 hover:bg-rose-500/10"
+                                  disabled={!!actionLoading}
+                                  onClick={() => handleReject(req.id)}
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <X className="size-3.5" />
+                                  )}
+                                  <span className="hidden sm:inline">Reject</span>
+                                </Button>
+                              )}
                             </>
                           )}
                         </div>
@@ -509,70 +642,127 @@ export default function IssuanceView() {
 
       {/* ── Issue Confirmation Dialog ──────────────────────── */}
       <Dialog open={!!issueReq} onOpenChange={(open) => !open && setIssueReq(null)}>
-        <DialogContent className="sm:max-w-md">
-          {issueReq && issueItem && (
+        <DialogContent className="sm:max-w-xl bg-card/95 backdrop-blur-xl border-border/50 max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          {issueReq && (
             <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+              <DialogHeader className="px-6 pt-6 pb-3">
+                <DialogTitle className="flex items-center gap-2 font-bold text-base">
                   <HandHeart className="size-4 text-primary" />
-                  Confirm Issuance
+                  Confirm Issuance — Request {shortId(issueReq.id)}
                 </DialogTitle>
                 <DialogDescription>
-                  Review the details below before issuing this item.
+                  Enter the quantity you wish to issue for each approved item.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-3 py-2">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-4 px-6 py-2 overflow-y-auto flex-1 text-xs">
+                <div className="grid grid-cols-2 gap-3 py-1">
                   <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Item</p>
-                    <p className="text-sm font-medium">{issueReq.itemName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Employee</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">Employee</p>
                     <p className="text-sm font-medium">{issueReq.employee}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Quantity</p>
-                    <p className="text-sm font-medium">{issueReq.qty}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">Stock After Issuance</p>
-                    <p className={`text-sm font-medium ${stockAfterIssue >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {stockAfterIssue}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">Department</p>
+                    <p className="text-sm font-medium">{issueReq.department}</p>
                   </div>
                 </div>
 
                 {issueReq.note && (
                   <div className="rounded-md bg-muted/20 border border-border/40 px-3 py-2">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Employee Note</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider mb-1">Employee Note</p>
                     <p className="text-xs text-foreground/80 leading-relaxed">{issueReq.note}</p>
                   </div>
                 )}
 
                 <Separator className="bg-border/30" />
 
-                <div className="flex items-center gap-2 rounded-md bg-muted/20 px-3 py-2">
-                  <Package className="size-3.5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    Version: <span className="font-mono text-foreground">{issueItem.version}</span>
-                  </span>
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Item Allocation</p>
+                  <div className="rounded-lg border border-border/40 overflow-hidden">
+                    <table className="w-full text-xs text-left border-collapse">
+                      <thead>
+                        <tr className="bg-muted/30 border-b border-border/30 text-muted-foreground">
+                          <th className="p-2 font-bold uppercase tracking-wider text-[9px]">Item Name</th>
+                          <th className="p-2 text-center font-bold uppercase tracking-wider text-[9px]">Approved</th>
+                          <th className="p-2 text-center font-bold uppercase tracking-wider text-[9px]">Issued</th>
+                          <th className="p-2 text-center font-bold uppercase tracking-wider text-[9px]">Available</th>
+                          <th className="p-2 text-right font-bold uppercase tracking-wider text-[9px] w-24">This Issue</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/20">
+                        {issueReq.lines && issueReq.lines.length > 0 ? (
+                          issueReq.lines.map((line) => {
+                            if (line.status === 'Rejected' || line.status === 'Cancelled') return null
+                            const maxAllowed = line.approvedQty - line.issuedQty
+                            const avail = getLineReadyQty(line)
+                            return (
+                              <tr key={line.id} className="hover:bg-muted/10">
+                                <td className="p-2 font-medium">{line.itemName}</td>
+                                <td className="p-2 text-center font-mono">{line.approvedQty}</td>
+                                <td className="p-2 text-center font-mono">{line.issuedQty}</td>
+                                <td className={`p-2 text-center font-mono font-medium ${avail >= maxAllowed ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {avail}
+                                </td>
+                                <td className="p-2 text-right">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={Math.min(maxAllowed, avail)}
+                                    value={issueLines[line.id] ?? ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value
+                                      setIssueLines((prev) => ({ ...prev, [line.id]: val }))
+                                    }}
+                                    placeholder="0"
+                                    className="h-7 text-right bg-background border-border/50 text-xs w-20 font-mono inline-block"
+                                  />
+                                </td>
+                              </tr>
+                            )
+                          })
+                        ) : (
+                          // Legacy fallback dialog row
+                          <tr className="hover:bg-muted/10">
+                            <td className="p-2 font-medium">{issueReq.itemName}</td>
+                            <td className="p-2 text-center font-mono">{issueReq.qty}</td>
+                            <td className="p-2 text-center font-mono">—</td>
+                            <td className="p-2 text-center font-mono font-medium">{issueItem ? issueItem.stock - issueItem.reservedQty : 0}</td>
+                            <td className="p-2 text-right">
+                              <Input
+                                type="number"
+                                min={0}
+                                max={issueReq.qty}
+                                value={issueLines['legacy'] ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setIssueLines((prev) => ({ ...prev, legacy: val }))
+                                }}
+                                placeholder="0"
+                                className="h-7 text-right bg-background border-border/50 text-xs w-20 font-mono inline-block"
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
 
-              <DialogFooter className="gap-2 sm:gap-2">
+              <DialogFooter className="px-6 py-4 border-t border-border/20 bg-muted/5 flex items-center justify-end gap-2 sm:gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => setIssueReq(null)}
-                  className="border-border"
+                  className="border-border text-xs"
                   disabled={!!actionLoading}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleIssue}
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5 text-xs shadow-lg shadow-primary/20"
                   disabled={!!actionLoading}
                 >
                   {actionLoading === issueReq.id ? (

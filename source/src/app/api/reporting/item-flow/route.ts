@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-utils';
+import { getKolkataDateString } from '@/lib/date-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     // Group by date (daily)
     const dailyMap: Record<string, { inQty: number; outQty: number }> = {};
     for (const t of txns) {
-      const dateKey = (t.date ?? t.createdAt).toISOString().slice(0, 10);
+      const dateKey = getKolkataDateString(t.date ?? t.createdAt);
       if (!dailyMap[dateKey]) dailyMap[dateKey] = { inQty: 0, outQty: 0 };
       if (t.type === 'IN') dailyMap[dateKey].inQty += t.qty;
       else dailyMap[dateKey].outQty += t.qty;

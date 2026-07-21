@@ -9,6 +9,7 @@ import {
 import { ClipboardList, Download } from 'lucide-react'
 import { RequestResponse } from '@/lib/api'
 import { toast } from 'sonner'
+import { getRequestNextAction, type NextActionTone } from '@/lib/request-fulfillment'
 
 interface RequestsTableProps {
   requests: RequestResponse[]
@@ -17,17 +18,27 @@ interface RequestsTableProps {
   onRowClick: (req: RequestResponse) => void
 }
 
-type Status = RequestResponse['status']
+type Status = string
 
 function statusBadge(status: Status) {
-  const map: Record<Status, string> = {
-    Pending:   'bg-amber-500/10 text-amber-700 border-amber-500/20',
-    Approved:  'bg-sky-500/10 text-sky-700 border-sky-500/20',
-    Issued:    'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-    Rejected:  'bg-rose-500/10 text-rose-700 border-rose-500/20',
-    Cancelled: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
+  const normalized = status.toUpperCase()
+  if (normalized.includes('PENDING')) return <Badge variant="pending">{status}</Badge>
+  if (normalized === 'ISSUED' || normalized === 'CLOSED') return <Badge variant="success">{status}</Badge>
+  if (normalized === 'APPROVED') return <Badge variant="warning">{status}</Badge>
+  if (normalized === 'REJECTED') return <Badge variant="destructive">{status}</Badge>
+  if (normalized === 'READYFORPICKUP') return <Badge variant="purple">{status}</Badge>
+  if (normalized === 'CANCELLED' || normalized === 'DRAFT') return <Badge variant="draft">{status}</Badge>
+  return <Badge variant="info">{status}</Badge>
+}
+
+function nextActionBadge(tone: NextActionTone) {
+  const map: Record<NextActionTone, string> = {
+    success: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+    warning: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
+    default: 'bg-sky-500/10 text-sky-700 border-sky-500/20',
+    muted: 'bg-muted text-muted-foreground border-border',
   }
-  return <Badge variant="outline" className={`text-[10px] font-semibold px-2 ${map[status]}`}>{status}</Badge>
+  return map[tone]
 }
 
 function formatDate(d: string | null) {
@@ -110,33 +121,47 @@ export function RequestsTable({ requests, loading, isAdmin, onRowClick }: Reques
           <TableHead>Item</TableHead>
           <TableHead>Qty</TableHead>
           <TableHead>Status</TableHead>
+          <TableHead>Next Action</TableHead>
           <TableHead>Requested</TableHead>
           <TableHead>Issued</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {requests.map((req) => (
-          <TableRow
-            key={req.id}
-            className="cursor-pointer"
-            onClick={() => onRowClick(req)}
-          >
-            <TableCell className="font-mono text-xs text-muted-foreground">
-              {shortId(req.id)}
-            </TableCell>
-            {isAdmin && (
-              <>
-                <TableCell className="text-sm">{req.employee}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{req.department}</TableCell>
-              </>
-            )}
-            <TableCell className="text-sm">{req.itemName}</TableCell>
-            <TableCell className="text-sm">{req.qty}</TableCell>
-            <TableCell>{statusBadge(req.status)}</TableCell>
-            <TableCell className="text-xs text-muted-foreground">{formatDate(req.createdAt)}</TableCell>
-            <TableCell className="text-xs text-muted-foreground">{formatDate(req.issuedAt)}</TableCell>
-          </TableRow>
-        ))}
+        {requests.map((req) => {
+          const nextAction = getRequestNextAction(req)
+          return (
+            <TableRow
+              key={req.id}
+              className="cursor-pointer"
+              onClick={() => onRowClick(req)}
+            >
+              <TableCell className="font-mono text-xs text-muted-foreground">
+                {shortId(req.id)}
+              </TableCell>
+              {isAdmin && (
+                <>
+                  <TableCell className="text-sm">{req.employee}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{req.department}</TableCell>
+                </>
+              )}
+              <TableCell className="text-sm">{req.itemName}</TableCell>
+              <TableCell className="text-sm">{req.qty}</TableCell>
+              <TableCell>{statusBadge(req.status)}</TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <Badge variant="outline" className={`text-[10px] font-semibold px-2 ${nextActionBadge(nextAction.tone)}`}>
+                    {nextAction.label}
+                  </Badge>
+                  {isAdmin && (
+                    <p className="text-[10px] text-muted-foreground">{nextAction.owner}</p>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-xs text-muted-foreground">{formatDate(req.createdAt)}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{formatDate(req.issuedAt)}</TableCell>
+            </TableRow>
+          )
+        })}
       </TableBody>
     </Table>
     </div>

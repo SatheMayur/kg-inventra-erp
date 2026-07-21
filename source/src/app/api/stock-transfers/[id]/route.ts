@@ -16,7 +16,9 @@ export async function GET(
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(auth.user!.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { id } = await params;
 
@@ -40,7 +42,9 @@ export async function PATCH(
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(auth.user!.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { id } = await params;
 

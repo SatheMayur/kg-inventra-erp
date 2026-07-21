@@ -7,6 +7,7 @@ import GuidedTour from '../components/GuidedTour';
 import { safeUser } from '../lib/safeUser';
 import { getCategoryColor, prewarmImages } from '../lib/itemImage';
 import FoodPhoto from '../components/FoodPhoto';
+import InventoryGridCard from '../components/InventoryGridCard';
 
 // ─── Style tokens (all vars from index.html) ───────────────────────────────
 
@@ -730,6 +731,7 @@ export default function Items() {
   const [locationFilter, setLocationFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState('true'); // 'true' | 'false' | 'all'
+  const [viewMode, setViewMode] = useState(localStorage.getItem('fg_items_view_mode') || 'list');
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -972,6 +974,24 @@ export default function Items() {
           ))}
         </select>
 
+        {/* View Mode Toggle — Grid / List */}
+        <div style={{ ...s.tabGroup, marginRight: '12px' }}>
+          <button
+            style={viewMode === 'list' ? { ...s.tab, ...s.tabActive } : s.tab}
+            onClick={() => { setViewMode('list'); localStorage.setItem('fg_items_view_mode', 'list'); }}
+            title="List View"
+          >
+            📋 List
+          </button>
+          <button
+            style={viewMode === 'grid' ? { ...s.tab, ...s.tabActive } : s.tab}
+            onClick={() => { setViewMode('grid'); localStorage.setItem('fg_items_view_mode', 'grid'); }}
+            title="Grid View"
+          >
+            🎴 Grid
+          </button>
+        </div>
+
         {/* Status pill-tabs — right-aligned */}
         <div style={s.tabGroup}>
           {[
@@ -990,144 +1010,253 @@ export default function Items() {
         </div>
       </div>
 
-      {/* ── Table ── */}
-      <div style={s.tableWrap}>
-        <div style={s.tableScroll}>
-          <table style={s.table}>
-            <thead>
-              <tr>
-                <th style={s.thCheck}>
-                  <input
-                    type="checkbox"
-                    checked={items.length > 0 && selectedIds.length === items.length}
-                    onChange={toggleSelectAll}
-                    title="Select all"
-                    style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
-                  />
-                </th>
-                <th style={{ ...s.th, width: '52px', padding: '10px 8px' }}></th>
-                <th style={s.th}>Item Code</th>
-                <th style={s.th}>Name / Grade</th>
-                <th style={s.th}>Sub-Category</th>
-                <th style={s.th}>Unit</th>
-                <th style={s.th}>Purchase Rate</th>
-                <th style={s.th}>MRP</th>
-                <th style={s.th}>Live Stock</th>
-                <th style={s.th}>Status</th>
-                <th style={{ ...s.th, textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
+      {viewMode === 'list' ? (
+        /* ── Table ── */
+        <div style={s.tableWrap}>
+          <div style={s.tableScroll}>
+            <table style={s.table}>
+              <thead>
                 <tr>
-                  <td colSpan={colSpan} style={s.emptyState}>
-                    <span style={{ opacity: 0.6 }}>Loading items...</span>
-                  </td>
+                  <th style={s.thCheck}>
+                    <input
+                      type="checkbox"
+                      checked={items.length > 0 && selectedIds.length === items.length}
+                      onChange={toggleSelectAll}
+                      title="Select all"
+                      style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+                    />
+                  </th>
+                  <th style={{ ...s.th, width: '52px', padding: '10px 8px' }}></th>
+                  <th style={s.th}>Item Code</th>
+                  <th style={s.th}>Name / Grade</th>
+                  <th style={s.th}>Sub-Category</th>
+                  <th style={s.th}>Unit</th>
+                  <th style={s.th}>Purchase Rate</th>
+                  <th style={s.th}>MRP</th>
+                  <th style={s.th}>Live Stock</th>
+                  <th style={s.th}>Status</th>
+                  <th style={{ ...s.th, textAlign: 'right' }}>Actions</th>
                 </tr>
-              )}
-              {!loading && items.length === 0 && (
-                <tr>
-                  <td colSpan={colSpan} style={s.emptyState}>
-                    No items found
-                  </td>
-                </tr>
-              )}
-              {!loading && items.map(item => {
-                const kg = parseFloat(item.live_stock_kg) || 0;
-                const isActive = item.is_active !== false;
-                const isSelected = selectedIds.includes(item.id);
-
-                const rowStyle = {
-                  opacity: isActive ? 1 : 0.7,
-                  background: isSelected ? 'var(--primary-dim)' : undefined,
-                  cursor: 'default',
-                  transition: 'background 0.1s',
-                };
-
-                return (
-                  <tr
-                    key={item.id}
-                    style={rowStyle}
-                    onMouseEnter={e => !isSelected && (e.currentTarget.style.background = 'var(--surface-2)')}
-                    onMouseLeave={e => !isSelected && (e.currentTarget.style.background = '')}
-                  >
-                    <td style={s.tdCheck}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelectItem(item.id)}
-                        style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
-                      />
-                    </td>
-                    <td style={{ ...s.td, padding: '6px 8px', width: '52px' }}>
-                      <ItemThumb item={item} onClick={() => navigate('/items/' + item.id)} />
-                    </td>
-                    <td style={s.td}>
-                      <button
-                        style={s.nameLink}
-                        onClick={() => navigate('/items/' + item.id)}
-                      >
-                        <span style={s.codeChip}>{item.item_code}</span>
-                      </button>
-                    </td>
-                    <td style={s.td}>
-                      <div style={{ fontWeight: '500', color: 'var(--text-1)', fontSize: '13px' }}>
-                        {item.variant_grade || item.sub_category_name || '—'}
-                      </div>
-                      {item.barcode && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-4)', marginTop: '2px', fontFamily: 'ui-monospace, monospace' }}>
-                          {item.barcode}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ ...s.td, color: 'var(--text-3)' }}>
-                      {item.sub_category_name || '—'}
-                    </td>
-                    <td style={{ ...s.td, color: 'var(--text-3)' }}>
-                      {item.unit}
-                    </td>
-                    <td style={s.td}>
-                      {item.purchase_rate
-                        ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>&#x20B9;{item.purchase_rate}</span>
-                        : <span style={{ color: 'var(--text-4)' }}>—</span>}
-                    </td>
-                    <td style={s.td}>
-                      {item.mrp
-                        ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>&#x20B9;{item.mrp}</span>
-                        : <span style={{ color: 'var(--text-4)' }}>—</span>}
-                    </td>
-                    <td style={s.td}>
-                      <span style={{ ...s.pillBase, ...stockPillStyle(kg) }}>
-                        {kg.toFixed(2)}&nbsp;{item.unit}
-                      </span>
-                    </td>
-                    <td style={s.td}>
-                      <span style={{ ...s.pillBase, padding: '3px 10px', ...statusPillStyle(isActive) }}>
-                        {isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ ...s.td, textAlign: 'right' }}>
-                      <RowMenu
-                        item={item}
-                        isActive={isActive}
-                        canWrite={canWrite}
-                        userRole={user.role}
-                        onEdit={() => openEdit(item)}
-                        onClone={() => handleClone(item)}
-                        onToggle={() => handleToggleActive(item)}
-                        onDelete={() => handleDelete(item)}
-                        onLabel={() => window.open('/api/items/' + item.id + '/label', '_blank')}
-                        isOpen={openMenuId === item.id}
-                        onOpenToggle={setOpenMenuId}
-                      />
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={colSpan} style={s.emptyState}>
+                      <span style={{ opacity: 0.6 }}>Loading items...</span>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                )}
+                {!loading && items.length === 0 && (
+                  <tr>
+                    <td colSpan={colSpan} style={s.emptyState}>
+                      No items found
+                    </td>
+                  </tr>
+                )}
+                {!loading && items.map(item => {
+                  const kg = parseFloat(item.live_stock_kg) || 0;
+                  const isActive = item.is_active !== false;
+                  const isSelected = selectedIds.includes(item.id);
+
+                  const rowStyle = {
+                    opacity: isActive ? 1 : 0.7,
+                    background: isSelected ? 'var(--primary-dim)' : undefined,
+                    cursor: 'default',
+                    transition: 'background 0.1s',
+                  };
+
+                  return (
+                    <tr
+                      key={item.id}
+                      style={rowStyle}
+                      onMouseEnter={e => !isSelected && (e.currentTarget.style.background = 'var(--surface-2)')}
+                      onMouseLeave={e => !isSelected && (e.currentTarget.style.background = '')}
+                    >
+                      <td style={s.tdCheck}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelectItem(item.id)}
+                          style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
+                        />
+                      </td>
+                      <td style={{ ...s.td, padding: '6px 8px', width: '52px' }}>
+                        <ItemThumb item={item} onClick={() => navigate('/items/' + item.id)} />
+                      </td>
+                      <td style={s.td}>
+                        <button
+                          style={s.nameLink}
+                          onClick={() => navigate('/items/' + item.id)}
+                        >
+                          <span style={s.codeChip}>{item.item_code}</span>
+                        </button>
+                      </td>
+                      <td style={s.td}>
+                        <div style={{ fontWeight: '500', color: 'var(--text-1)', fontSize: '13px' }}>
+                          {item.variant_grade || item.sub_category_name || '—'}
+                        </div>
+                        {item.barcode && (
+                          <div style={{ fontSize: '11px', color: 'var(--text-4)', marginTop: '2px', fontFamily: 'ui-monospace, monospace' }}>
+                            {item.barcode}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ ...s.td, color: 'var(--text-3)' }}>
+                        {item.sub_category_name || '—'}
+                      </td>
+                      <td style={{ ...s.td, color: 'var(--text-3)' }}>
+                        {item.unit}
+                      </td>
+                      <td style={s.td}>
+                        {item.purchase_rate
+                          ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>&#x20B9;{item.purchase_rate}</span>
+                          : <span style={{ color: 'var(--text-4)' }}>—</span>}
+                      </td>
+                      <td style={s.td}>
+                        {item.mrp
+                          ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>&#x20B9;{item.mrp}</span>
+                          : <span style={{ color: 'var(--text-4)' }}>—</span>}
+                      </td>
+                      <td style={{ ...s.td, width: '220px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <span style={{ ...s.pillBase, ...stockPillStyle(kg), fontSize: '11px', padding: '2px 8px' }}>
+                              {kg.toFixed(2)}&nbsp;{item.unit}
+                            </span>
+                            
+                            {/* Velocity Badge */}
+                            {(() => {
+                              const velocity = parseFloat(item.avg_daily_consumption) || 0;
+                              let velText = 'Slow';
+                              let velIcon = '💤';
+                              let velColor = 'var(--text-3)';
+                              let velBg = 'var(--border)';
+                              if (velocity >= 5) {
+                                velText = 'Fast';
+                                velIcon = '🔥';
+                                velColor = 'var(--danger)';
+                                velBg = 'var(--danger-dim)';
+                              } else if (velocity > 0) {
+                                velText = 'Active';
+                                velIcon = '⚡';
+                                velColor = 'var(--warning)';
+                                velBg = 'var(--warning-dim)';
+                              }
+                              return (
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  borderRadius: '12px',
+                                  padding: '1px 6px',
+                                  fontSize: '10px',
+                                  fontWeight: '600',
+                                  background: velBg,
+                                  color: velColor,
+                                  border: '1px solid var(--border)'
+                                }} title={`Velocity: ${velocity} ${item.unit}/day`}>
+                                  <span>{velIcon}</span>
+                                  <span>{velText}</span>
+                                </span>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Stock health progress bar */}
+                          {(() => {
+                            const rop = parseFloat(item.rop_kg) || 0;
+                            let fillPct = 0;
+                            let fillColor = 'var(--success)';
+                            if (kg <= 0) {
+                              fillPct = 0;
+                            } else if (rop > 0) {
+                              fillPct = Math.min(100, (kg / rop) * 100);
+                              fillColor = kg <= rop ? 'var(--warning)' : 'var(--success)';
+                            } else {
+                              fillPct = 100;
+                            }
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ height: '5px', background: 'var(--surface-2)', borderRadius: '2.5px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                                  <div style={{ height: '100%', width: `${fillPct}%`, background: fillColor, borderRadius: '2.5px' }} />
+                                </div>
+                                {rop > 0 && (
+                                  <div style={{ fontSize: '9px', color: 'var(--text-3)', textAlign: 'right' }}>
+                                    ROP: {rop} {item.unit}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </td>
+                      <td style={s.td}>
+                        <span style={{ ...s.pillBase, padding: '3px 10px', ...statusPillStyle(isActive) }}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td style={{ ...s.td, textAlign: 'right' }}>
+                        <RowMenu
+                          item={item}
+                          isActive={isActive}
+                          canWrite={canWrite}
+                          userRole={user.role}
+                          onEdit={() => openEdit(item)}
+                          onClone={() => handleClone(item)}
+                          onToggle={() => handleToggleActive(item)}
+                          onDelete={() => handleDelete(item)}
+                          onLabel={() => window.open('/api/items/' + item.id + '/label', '_blank')}
+                          isOpen={openMenuId === item.id}
+                          onOpenToggle={setOpenMenuId}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ── Grid ── */
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))',
+          gap: '20px',
+          padding: '16px 32px 32px',
+        }}>
+          {loading && (
+            <div style={{ gridColumn: '1 / -1', ...s.emptyState, background: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+              <span style={{ opacity: 0.6 }}>Loading items...</span>
+            </div>
+          )}
+          {!loading && items.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', ...s.emptyState, background: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)' }}>
+              No items found
+            </div>
+          )}
+          {!loading && items.map(item => {
+            const isSelected = selectedIds.includes(item.id);
+            return (
+              <InventoryGridCard
+                key={item.id}
+                item={item}
+                isSelected={isSelected}
+                onSelect={() => toggleSelectItem(item.id)}
+                onEdit={() => openEdit(item)}
+                onClone={() => handleClone(item)}
+                onToggle={() => handleToggleActive(item)}
+                onDelete={() => handleDelete(item)}
+                onLabel={() => window.open('/api/items/' + item.id + '/label', '_blank')}
+                canWrite={canWrite}
+                userRole={user.role}
+                openMenuId={openMenuId}
+                onOpenToggle={setOpenMenuId}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Floating Bulk Bar ── */}
       {canWrite && selectedIds.length > 0 && (

@@ -55,7 +55,7 @@ export function BarcodeListener() {
               description: `Stock: ${item.stock} | Reserved: ${item.reservedQty} | Available: ${available} ${item.unit}`,
               action: {
                 label: 'View',
-                onClick: () => setCurrentView('inventory'),
+                onClick: () => setCurrentView('store-item-master'),
               },
               duration: 6000,
             }
@@ -69,7 +69,7 @@ export function BarcodeListener() {
       // Legacy HUB- format
       if (code.startsWith('HUB-')) {
         toast.info(`Scanned: ${code}`, { description: 'Navigating to inventory…' })
-        setCurrentView('inventory')
+        setCurrentView('store-item-master')
         return
       }
 

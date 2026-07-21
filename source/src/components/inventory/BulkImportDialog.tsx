@@ -104,7 +104,7 @@ function downloadTemplate() {
   a.href = url
   a.download = 'inventra-import-template.csv'
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 
 export function BulkImportDialog({ open, onOpenChange, onImportSuccess }: BulkImportDialogProps) {
@@ -269,7 +269,7 @@ export function BulkImportDialog({ open, onOpenChange, onImportSuccess }: BulkIm
               </div>
 
               {/* Preview table */}
-              <ScrollArea className="h-64 rounded-lg border border-border/50">
+              <div className="h-64 rounded-lg border border-border/50 overflow-y-auto">
                 <Table>
                   <TableHeader className="sticky top-0 bg-muted/40 backdrop-blur-sm z-10">
                     <TableRow className="hover:bg-transparent border-border/30">
@@ -305,7 +305,7 @@ export function BulkImportDialog({ open, onOpenChange, onImportSuccess }: BulkIm
                     ))}
                   </TableBody>
                 </Table>
-              </ScrollArea>
+              </div>
 
               {invalidRows.length > 0 && (
                 <p className="text-[10px] text-muted-foreground">

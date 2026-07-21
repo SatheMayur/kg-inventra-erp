@@ -64,6 +64,45 @@ const FLOORS = [
   'GF-B2', 'GF-B3', 'SF-B2', 'SF-B6', 'SF02',
 ]
 
+const ROLES = [
+  { value: 'employee', label: 'Employee' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'STORE_ADMIN', label: 'Store Admin' },
+  { value: 'STORE_OPERATOR', label: 'Store Operator' },
+  { value: 'DEPT_USER', label: 'Dept User' },
+  { value: 'DEPT_HEAD', label: 'Dept Head' },
+  { value: 'PURCHASE_USER', label: 'Purchase User' },
+  { value: 'ACCOUNTS_USER', label: 'Accounts User' },
+  { value: 'MANAGEMENT', label: 'Management' },
+]
+
+function getRoleBadge(role: string, isDeptHead?: boolean) {
+  const map: Record<string, { label: string, classes: string }> = {
+    admin: { label: 'Admin', classes: 'bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/15' },
+    employee: { label: 'Employee', classes: 'bg-sky-500/10 text-sky-700 border-sky-500/20 hover:bg-sky-500/15' },
+    STORE_ADMIN: { label: 'Store Admin', classes: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/20 hover:bg-indigo-500/15' },
+    STORE_OPERATOR: { label: 'Store Operator', classes: 'bg-violet-500/10 text-violet-700 border-violet-500/20 hover:bg-violet-500/15' },
+    DEPT_USER: { label: 'Dept User', classes: 'bg-teal-500/10 text-teal-700 border-teal-500/20 hover:bg-teal-500/15' },
+    DEPT_HEAD: { label: 'Dept Head', classes: 'bg-purple-500/10 text-purple-700 border-purple-500/20 hover:bg-purple-500/15' },
+    PURCHASE_USER: { label: 'Purchase User', classes: 'bg-pink-500/10 text-pink-700 border-pink-500/20 hover:bg-pink-500/15' },
+    ACCOUNTS_USER: { label: 'Accounts User', classes: 'bg-rose-500/10 text-rose-700 border-rose-500/20 hover:bg-rose-500/15' },
+    MANAGEMENT: { label: 'Management', classes: 'bg-blue-500/10 text-blue-700 border-blue-500/20 hover:bg-blue-500/15' },
+  }
+  const config = map[role] || { label: role, classes: 'bg-slate-500/10 text-slate-700 border-slate-500/20' }
+  return (
+    <div className="flex flex-wrap gap-1 items-center">
+      <Badge className={config.classes}>
+        {config.label}
+      </Badge>
+      {isDeptHead && (
+        <Badge className="bg-purple-500/10 text-purple-700 border-purple-500/20 hover:bg-purple-500/15">
+          Dept Head
+        </Badge>
+      )}
+    </div>
+  )
+}
+
 interface UserWithRequests extends UserResponse {
   requestCount?: number
 }
@@ -75,6 +114,7 @@ export default function UsersView() {
   const [users, setUsers] = useState<UserWithRequests[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [deptsList, setDeptsList] = useState<string[]>([])
 
   // Dialogs
   const [addOpen, setAddOpen] = useState(false)
@@ -88,6 +128,7 @@ export default function UsersView() {
   const [addDept, setAddDept] = useState('Admin')
   const [addFloor, setAddFloor] = useState('SF-B2')
   const [addRole, setAddRole] = useState('employee')
+  const [addIsDeptHead, setAddIsDeptHead] = useState(false)
   const [addPassword, setAddPassword] = useState('')
   const [addLoading, setAddLoading] = useState(false)
 
@@ -96,6 +137,7 @@ export default function UsersView() {
   const [editDept, setEditDept] = useState('')
   const [editFloor, setEditFloor] = useState('')
   const [editRole, setEditRole] = useState('')
+  const [editIsDeptHead, setEditIsDeptHead] = useState(false)
   const [editLoading, setEditLoading] = useState(false)
 
   // Reset password form
@@ -114,7 +156,24 @@ export default function UsersView() {
     }
   }, [])
 
-  useEffect(() => { fetchUsers() }, [fetchUsers])
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
+
+  useEffect(() => {
+    async function loadDepts() {
+      try {
+        const list = await api.departments.list()
+        setDeptsList(list)
+        if (list.length > 0 && !list.includes(addDept)) {
+          setAddDept(list[0])
+        }
+      } catch {
+        setDeptsList(DEPARTMENTS)
+      }
+    }
+    loadDepts()
+  }, [])
 
   // Client-side filter across name, empId, department
   const filtered = search
@@ -134,6 +193,7 @@ export default function UsersView() {
     setEditDept(u.department)
     setEditFloor(u.floor)
     setEditRole(u.role)
+    setEditIsDeptHead(!!u.isDeptHead)
   }
 
   function resetAddForm() {
@@ -143,6 +203,7 @@ export default function UsersView() {
     setAddFloor('SF-B2')
     setAddRole('employee')
     setAddPassword('')
+    setAddIsDeptHead(false)
   }
 
   async function handleAdd() {
@@ -162,6 +223,7 @@ export default function UsersView() {
         department: addDept,
         floor: addFloor,
         role: addRole,
+        isDeptHead: addIsDeptHead,
         password: addPassword,
       })
       toast.success('Employee added successfully')
@@ -187,6 +249,7 @@ export default function UsersView() {
         department: editDept,
         floor: editFloor,
         role: editRole,
+        isDeptHead: editIsDeptHead,
       })
       if (editUser.id === user?.id && editUser.role === 'admin' && editRole === 'employee') {
         useAppStore.getState().setUser({ ...user!, role: 'employee' as const })
@@ -296,7 +359,7 @@ export default function UsersView() {
               <p className="text-sm">{search ? 'No users match your search' : 'No users found'}</p>
             </div>
           ) : (
-            <ScrollArea className="max-h-[560px]">
+            <div className="max-h-[560px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
@@ -317,12 +380,7 @@ export default function UsersView() {
                       <TableCell className="text-muted-foreground">{u.department}</TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">{u.floor}</TableCell>
                       <TableCell>
-                        <Badge className={u.role === 'admin'
-                          ? 'bg-amber-500/10 text-amber-700 border-amber-500/20 hover:bg-amber-500/15'
-                          : 'bg-sky-500/10 text-sky-700 border-sky-500/20 hover:bg-sky-500/15'
-                        }>
-                          {u.role === 'admin' ? 'Admin' : 'Employee'}
-                        </Badge>
+                        {getRoleBadge(u.role, u.isDeptHead)}
                       </TableCell>
                       <TableCell>
                         <Badge className={u.active
@@ -382,7 +440,7 @@ export default function UsersView() {
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -407,7 +465,13 @@ export default function UsersView() {
               <Label>Department</Label>
               <Select value={addDept} onValueChange={setAddDept}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>{DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {deptsList.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
@@ -422,10 +486,25 @@ export default function UsersView() {
               <Select value={addRole} onValueChange={setAddRole}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center space-x-2 py-1">
+              <input
+                type="checkbox"
+                id="add-is-dept-head"
+                checked={addIsDeptHead}
+                onChange={(e) => setAddIsDeptHead(e.target.checked)}
+                className="size-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <Label htmlFor="add-is-dept-head" className="cursor-pointer text-sm font-medium">
+                Is Department Head
+              </Label>
             </div>
             <div className="space-y-2">
               <Label htmlFor="add-password">Password</Label>
@@ -458,7 +537,13 @@ export default function UsersView() {
               <Label>Department</Label>
               <Select value={editDept} onValueChange={setEditDept}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>{DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {deptsList.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
@@ -473,10 +558,25 @@ export default function UsersView() {
               <Select value={editRole} onValueChange={setEditRole}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="employee">Employee</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {ROLES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center space-x-2 py-1">
+              <input
+                type="checkbox"
+                id="edit-is-dept-head"
+                checked={editIsDeptHead}
+                onChange={(e) => setEditIsDeptHead(e.target.checked)}
+                className="size-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <Label htmlFor="edit-is-dept-head" className="cursor-pointer text-sm font-medium">
+                Is Department Head
+              </Label>
             </div>
             {isSelf(editUser) && editRole === 'employee' && editUser?.role === 'admin' && (
               <p className="text-xs text-amber-500">⚠ Changing your own role to Employee will redirect you away from admin views.</p>

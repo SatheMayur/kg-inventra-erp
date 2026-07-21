@@ -22,6 +22,10 @@ export async function PATCH(
       });
 
       if (!checkout) throw new ApiError(404, 'Checkout not found', 'NOT_FOUND');
+      const canManageCheckouts = ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(auth.user!.role);
+      if (!canManageCheckouts && checkout.userId !== auth.user!.id) {
+        throw new ApiError(403, 'You can only return your own checkout', 'FORBIDDEN');
+      }
       if (checkout.status === 'RETURNED') {
         throw new ApiError(400, 'Item already returned', 'BAD_REQUEST');
       }
@@ -44,6 +48,7 @@ export async function PATCH(
         delta: Math.round(checkout.qty),
         reference: `Return ${id}`,
         userId: auth.user?.id,
+        subType: 'RETURN',
       });
 
       return u;

@@ -13,6 +13,7 @@ import PurchaseOrders from './pages/PurchaseOrders';
 import PurchaseOrderDetail from './pages/PurchaseOrderDetail';
 import Inward from './pages/Inward';
 import InwardDetail from './pages/InwardDetail';
+import InvoiceBank from './pages/InvoiceBank';
 import Outward from './pages/Outward';
 import OutwardDetail from './pages/OutwardDetail';
 import Challan from './pages/Challan';
@@ -33,9 +34,19 @@ import SystemHealth from './pages/SystemHealth';
 import Locations from './pages/Locations';
 import CustomFields from './pages/CustomFields';
 import EPRDashboard from './pages/EPRDashboard';
+import {
+  StoreItemMaster,
+  StoreRequisitionMaster,
+  PurchaseOrderProcess,
+  PurchaseInvoiceEntry,
+  TransferToDepartment,
+  StockTracking,
+} from './pages/StoreModules';
 
 function ProtectedRoute({ children, roles }) {
   const token = localStorage.getItem('fg_token');
+  const isLocalDemo = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocalDemo) return children;
   if (!token) return <Navigate to="/login" replace />;
   if (roles && roles.length > 0) {
     const user = safeUser();
@@ -69,12 +80,19 @@ export default function App() {
           <Route path="/purchase-orders/:id" element={<P><PurchaseOrderDetail /></P>} />
           <Route path="/inward" element={<P><Inward /></P>} />
           <Route path="/inward/:id" element={<P><InwardDetail /></P>} />
+          <Route path="/invoice-bank" element={<P><InvoiceBank /></P>} />
           <Route path="/outward" element={<P><Outward /></P>} />
           <Route path="/outward/:id" element={<P><OutwardDetail /></P>} />
           <Route path="/stock-transfers" element={<P><StockTransfer /></P>} />
           <Route path="/challan/:id" element={<P><Challan /></P>} />
           <Route path="/reports" element={<P><Reports /></P>} />
           <Route path="/mis-dashboard" element={<P><MISDashboard /></P>} />
+          <Route path="/store/item-master" element={<P><StoreItemMaster /></P>} />
+          <Route path="/store/requisition" element={<P><StoreRequisitionMaster /></P>} />
+          <Route path="/store/purchase-order" element={<P><PurchaseOrderProcess /></P>} />
+          <Route path="/store/purchase-invoice" element={<P><PurchaseInvoiceEntry /></P>} />
+          <Route path="/store/transfer-to-department" element={<P><TransferToDepartment /></P>} />
+          <Route path="/store/stock-tracking" element={<P><StockTracking /></P>} />
           <Route path="/expiry-alerts" element={<P><ExpiryAlerts /></P>} />
           <Route path="/margin-report" element={<P><MarginReport /></P>} />
           <Route path="/system-health" element={<P roles={['admin']}><SystemHealth /></P>} />
@@ -89,7 +107,7 @@ export default function App() {
           <Route path="/profile" element={<P><Profile /></P>} />
           <Route path="/epr" element={<P><EPRDashboard /></P>} />
           <Route path="/features" element={<FeaturesShowcase />} />
-          <Route path="/" element={<P><Dashboard /></P>} />
+          <Route path="/" element={<P><StoreItemMaster /></P>} />
           <Route path="*" element={<Navigate to="/items" replace />} />
         </Routes>
       </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-utils';
+import { getKolkataDaysAhead } from '@/lib/date-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     // Low stock alerts
-    const allItems = await db.item.findMany({ where: { deletedAt: null } });
+    const allItems = await db.item.findMany({ where: { deletedAt: null, active: true } });
     const lowStockAlerts = allItems
       .filter((item) => item.stock <= item.minStock)
       .map((item) => ({
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
       }));
 
     // Maintenance due alerts (due within 7 days or overdue)
-    const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const sevenDaysFromNow = getKolkataDaysAhead(7);
     const maintenanceAlerts = await db.maintenanceSchedule.findMany({
       where: {
         status: { in: ['PENDING', 'OVERDUE'] },
@@ -40,13 +41,34 @@ export async function GET(request: NextRequest) {
       status: s.status,
     }));
 
-    const alerts = [...lowStockAlerts, ...maintenanceMapped];
+    // Warranty / license expiry alerts (expiring within 30 days or already expired)
+    const thirtyDaysFromNow = getKolkataDaysAhead(30);
+    const expiringAssets = await db.asset.findMany({
+      where: {
+        status: { not: 'RETIRED' },
+        OR: [
+          { warrantyExpiry: { lte: thirtyDaysFromNow } },
+          { licenseExpiry: { lte: thirtyDaysFromNow } },
+        ],
+      },
+    });
+    const expiryAlerts = expiringAssets.map((a) => ({
+      type: 'EXPIRY' as const,
+      assetId: a.id,
+      name: a.name,
+      serialNumber: a.serialNumber,
+      warrantyExpiry: a.warrantyExpiry,
+      licenseExpiry: a.licenseExpiry,
+    }));
+
+    const alerts = [...lowStockAlerts, ...maintenanceMapped, ...expiryAlerts];
 
     return NextResponse.json({
       alerts,
       counts: {
         lowStock: lowStockAlerts.length,
         maintenance: maintenanceMapped.length,
+        expiry: expiryAlerts.length,
         total: alerts.length,
       },
     });
