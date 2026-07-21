@@ -49,7 +49,7 @@
   --radius: 0.5rem;
   --background: rgba(242, 242, 247, 0.45);
   --foreground: #292524;
-  --card: rgba(255, 255, 255, 0.50);
+  --card: rgba(255, 255, 255, 0.82);
   --card-foreground: #292524;
   --popover: rgba(255, 255, 255, 0.84);
   --popover-foreground: #292524;
@@ -196,7 +196,7 @@ body {
 /* Level 3: Dialog / Sheet (18px) */
 [data-slot="dialog-content"],
 [data-slot="sheet-content"] {
-  background: rgba(255, 255, 255, 0.80) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(18px) saturate(170%);
   -webkit-backdrop-filter: blur(18px) saturate(170%);
   border: 2px solid rgba(255, 255, 255, 0.55);
@@ -216,10 +216,10 @@ body {
 
 /* Base: Sticky header (12px) */
 header.sticky {
-  background: rgba(255, 255, 255, 0.60) !important;
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
-  border-bottom: 2px solid rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.50) !important;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.70), 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 

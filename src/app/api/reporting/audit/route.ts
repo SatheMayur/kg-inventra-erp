@@ -7,7 +7,7 @@ const PAGE_SIZE = 50;
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorize(request, ['admin'], { rootOnly: true });
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN', 'MANAGEMENT'], { rootOnly: true });
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);

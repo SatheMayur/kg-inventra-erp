@@ -3,25 +3,34 @@ import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 
+const DEFAULT_FLAGS: Record<string, boolean> = {
+  csvExport: true,
+  tooltips: true,
+  reporting: true,
+  barcode: false,
+};
+
+function toFlagsMap(flags: Array<{ key: string; value: boolean }>) {
+  const flagsMap: Record<string, boolean> = { ...DEFAULT_FLAGS };
+  for (const flag of flags) flagsMap[flag.key] = flag.value;
+  return flagsMap;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    // Allow unauthenticated reads of flags (useful for public UI); only block non-401 errors
-    const auth = await authorize(request);
-    if (auth.error && auth.status !== 401) return NextResponse.json({ error: auth.error }, { status: auth.status });
-
     const flags = await db.featureFlag.findMany({ orderBy: { key: 'asc' }, take: 100 });
-    const flagsMap: Record<string, boolean> = {};
-    for (const flag of flags) flagsMap[flag.key] = flag.value;
+    const flagsMap = toFlagsMap(flags);
 
     return NextResponse.json({ flags: flagsMap });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[settings/flags] falling back to defaults:', error);
+    return NextResponse.json({ flags: DEFAULT_FLAGS });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await authorize(request, ['admin'], { rootOnly: true });
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN'], { rootOnly: true });
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
@@ -32,13 +41,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const flag = await db.featureFlag.findUnique({ where: { key } });
-    if (!flag) throw new ApiError(404, 'Feature flag not found', 'NOT_FOUND');
-
-    await db.featureFlag.update({ where: { key }, data: { value } });
+    if (flag) {
+      await db.featureFlag.update({ where: { key }, data: { value } });
+    } else {
+      await db.featureFlag.create({ data: { key, value } });
+    }
 
     const allFlags = await db.featureFlag.findMany({ orderBy: { key: 'asc' } });
-    const flagsMap: Record<string, boolean> = {};
-    for (const f of allFlags) flagsMap[f.key] = f.value;
+    const flagsMap = toFlagsMap(allFlags);
 
     return NextResponse.json({ flags: flagsMap });
   } catch (error) {

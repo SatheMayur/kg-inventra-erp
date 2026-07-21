@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { ApiError } from './api-utils';
 import { resolveSubType, type MovementSubType } from './movement-subtype';
+import { ITEM_NATURE } from './item-master';
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,6 +38,9 @@ export async function mutateStock(
 
   const item = await tx.item.findUnique({ where: { id: opts.itemId } });
   if (!item || item.deletedAt) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
+  if (item.itemNature === ITEM_NATURE.SERVICE) {
+    throw new ApiError(400, 'Service items cannot be posted to inventory stock', 'BAD_REQUEST');
+  }
 
   if (opts.expectedVersion !== undefined && item.version !== opts.expectedVersion) {
     throw new ApiError(409, 'Item has been modified since it was last read', 'CONFLICT');
@@ -125,7 +129,9 @@ type Numbered =
   | 'stockTransfer'
   | 'gatePass'
   | 'deliveryChallan'
-  | 'purchaseInvoice';
+  | 'purchaseInvoice'
+  | 'request'
+  | 'goodsReceipt';
 
 /**
  * Generate the next sequential document number (e.g. PO-001). Centralises the
@@ -138,6 +144,29 @@ export async function nextSequentialNumber(
   model: Numbered,
   prefix: string
 ): Promise<string> {
-  const count: number = await (tx as any)[model].count();
-  return `${prefix}-${String(count + 1).padStart(3, '0')}`;
+  const modelNumberFieldMap: Record<Numbered, string> = {
+    purchaseOrder: 'poNumber',
+    stockTransfer: 'memoNumber',
+    gatePass: 'passNumber',
+    deliveryChallan: 'challanNumber',
+    purchaseInvoice: 'invoiceNumber',
+    request: 'requestNumber',
+    goodsReceipt: 'grnNumber',
+  };
+
+  const field = modelNumberFieldMap[model];
+  const latest = await (tx as any)[model].findFirst({
+    where: { [field]: { startsWith: prefix } },
+    orderBy: { [field]: 'desc' },
+    select: { [field]: true },
+  });
+
+  if (!latest) {
+    return `${prefix}-001`;
+  }
+
+  const latestStr = latest[field] as string;
+  const match = latestStr.match(/\d+$/);
+  const nextNum = match ? parseInt(match[0], 10) + 1 : 1;
+  return `${prefix}-${String(nextNum).padStart(3, '0')}`;
 }

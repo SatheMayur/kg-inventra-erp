@@ -20,7 +20,7 @@ export async function PATCH(
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (auth.user?.role !== 'admin' && auth.user?.role !== 'STORE_ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { id: itemId, variantId } = await params;
 
@@ -48,7 +48,7 @@ export async function DELETE(
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (auth.user?.role !== 'admin' && auth.user?.role !== 'STORE_ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { id: itemId, variantId } = await params;
 

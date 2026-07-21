@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError, ApiError } from '@/lib/api-utils';
 import { z } from 'zod';
+import { getKolkataDateString } from '@/lib/date-utils';
 
 const gatePassCreateSchema = z.object({
   type: z.enum(['IN', 'OUT']),
@@ -16,7 +17,8 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const isStoreUser = auth.user?.role === 'admin' || auth.user?.role === 'STORE_ADMIN' || auth.user?.role === 'STORE_OPERATOR';
+    if (!isStoreUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const gatePasses = await db.gatePass.findMany({
       include: { request: true },
@@ -33,7 +35,8 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const isStoreUser = auth.user?.role === 'admin' || auth.user?.role === 'STORE_ADMIN' || auth.user?.role === 'STORE_OPERATOR';
+    if (!isStoreUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const data = gatePassCreateSchema.parse(await request.json());
 
@@ -43,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate sequential pass number GP-YYYYMMDD-NNN
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const date = getKolkataDateString().replace(/-/g, '');
     const count = await db.gatePass.count({
       where: { passNumber: { startsWith: `GP-${date}` } },
     });
@@ -71,7 +74,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const isStoreUser = auth.user?.role === 'admin' || auth.user?.role === 'STORE_ADMIN' || auth.user?.role === 'STORE_OPERATOR';
+    if (!isStoreUser) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = await request.json();
     const { id, status } = body;
@@ -87,6 +91,14 @@ export async function PATCH(request: NextRequest) {
 
     const existing = await db.gatePass.findUnique({ where: { id } });
     if (!existing) throw new ApiError(404, 'Gate pass not found', 'NOT_FOUND');
+
+    // Prevent invalid status transitions
+    if (existing.status === 'CANCELLED') {
+      throw new ApiError(400, 'Cancelled gate passes cannot be modified', 'BAD_REQUEST');
+    }
+    if (existing.status === 'COMPLETED' && status !== 'CANCELLED') {
+      throw new ApiError(400, 'Completed gate passes can only be cancelled', 'BAD_REQUEST');
+    }
 
     const pass = await db.gatePass.update({
       where: { id },

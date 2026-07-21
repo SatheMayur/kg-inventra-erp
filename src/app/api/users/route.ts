@@ -14,13 +14,14 @@ const USER_SELECT = {
   floor: true,
   role: true,
   active: true,
+  isDeptHead: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorize(request, ['admin'], { rootOnly: true });
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN'], { rootOnly: true });
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const users = await db.user.findMany({
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await authorize(request, ['admin'], { rootOnly: true });
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN'], { rootOnly: true });
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
         department: validated.department,
         floor: validated.floor || '',
         role: validated.role,
+        isDeptHead: validated.isDeptHead,
         password: hashed,
         active: true,
       },

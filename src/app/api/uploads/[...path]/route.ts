@@ -24,8 +24,12 @@ export async function GET(
   }
   const filePath = path.join(process.cwd(), 'public', 'uploads', rel);
   try {
+    const ext = path.extname(filePath).toLowerCase();
+    const type = MIME[ext];
+    if (!type) {
+      return new NextResponse('Not found', { status: 404 });
+    }
     const data = await fs.readFile(filePath);
-    const type = MIME[path.extname(filePath).toLowerCase()] ?? 'application/octet-stream';
     return new NextResponse(new Uint8Array(data), {
       headers: {
         'Content-Type': type,

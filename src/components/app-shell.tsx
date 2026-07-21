@@ -26,6 +26,7 @@ import {
   Bell,
   Plug2,
   MessageCircle,
+  TrendingUp,
 } from 'lucide-react'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar'
 import { useAppStore } from '@/lib/store'
-import { api } from '@/lib/api'
+import { api, ApiClientError } from '@/lib/api'
 import { toast } from 'sonner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -87,6 +88,7 @@ import AlertsView from '@/components/views/alerts-view'
 import IntegrationsView from '@/components/views/integrations-view'
 import AssetsView from '@/components/views/assets-view'
 import WhatsAppInboxView from '@/components/views/whatsapp-inbox-view'
+import PriceManagementView from '@/components/views/price-management-view'
 import { BarcodeListener } from '@/components/barcode-listener'
 import { CommandBar } from '@/components/command-bar'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -101,9 +103,9 @@ interface NavItem {
 
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Workspace', ids: ['dashboard', 'inventory', 'requests', 'import', 'tags', 'custom-fields'] },
-  { label: 'Store Management', ids: ['store-item-master', 'store-requisition-master', 'purchase-order-process', 'purchase-invoice-entry', 'transfer-to-department', 'stock-tracking'] },
+  { label: 'Store Management', ids: ['store-item-master', 'store-requisition-master', 'purchase-order-process', 'price-management', 'purchase-invoice-entry', 'transfer-to-department', 'stock-tracking'] },
   { label: 'Operations', ids: ['procurement', 'logistics', 'transfers', 'issuance', 'checkout', 'pick-lists', 'alerts', 'whatsapp-inbox'] },
-  { label: 'Analytics', ids: ['reporting', 'transactions'] },
+  { label: 'Analytics', ids: ['reporting', 'transactions', 'price-management'] },
   { label: 'System', ids: ['audit', 'users', 'settings', 'integrations'] },
 ]
 
@@ -243,9 +245,15 @@ const VIEW_CONFIG: Record<string, { label: string; roles: string[]; icon: React.
   },
   'whatsapp-inbox': {
     label: 'WhatsApp Inbox',
-    roles: ['admin', 'STORE_ADMIN'],
+    roles: ['admin', 'STORE_ADMIN', 'STORE_OPERATOR', 'PURCHASE_USER', 'DEPT_HEAD', 'DEPT_USER', 'ACCOUNTS_USER', 'MANAGEMENT'],
     icon: <MessageCircle className="size-4" />,
-    subtitle: 'Conversational requisitions and support'
+    subtitle: 'Operational vendor messaging, requisitions and support'
+  },
+  'price-management': {
+    label: 'Price Management',
+    roles: ['admin', 'employee', 'STORE_ADMIN', 'STORE_OPERATOR', 'PURCHASE_USER', 'ACCOUNTS_USER', 'MANAGEMENT'],
+    icon: <TrendingUp className="size-4" />,
+    subtitle: 'Track purchase rates, simple/weighted averages, and spend trends'
   },
   'store-item-master': {
     label: 'Store Item Master',
@@ -371,6 +379,8 @@ function ViewRenderer({ view, user, onPitchModeChange }: { view: string; user: a
       return <AlertsView />
     case 'whatsapp-inbox':
       return <WhatsAppInboxView />
+    case 'price-management':
+      return <PriceManagementView />
     case 'integrations':
       return <IntegrationsView />
     case 'store-item-master':
@@ -459,6 +469,7 @@ export default function AppShell() {
         const data = await api.reporting.dashboard()
         setPendingCount(data.pendingCount + data.approvedCount)
       } catch (err) {
+        if (err instanceof ApiClientError && err.status === 401) return
         console.error('[AppShell] Failed to fetch pending count:', err)
       }
     }
@@ -531,25 +542,25 @@ export default function AppShell() {
             const groupItems = navItems.filter((item) => group.ids.includes(item.id))
             if (groupItems.length === 0) return null
             return (
-              <SidebarGroup key={group.label}>
-                <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40">
+              <SidebarGroup key={group.label} className="py-1.5">
+                <SidebarGroupLabel className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70 px-2 py-1 select-none">
                   {group.label}
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <SidebarMenu>
+                  <SidebarMenu className="gap-0.5">
                     {groupItems.map((item) => (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
                           isActive={resolvedView === item.id}
                           onClick={() => setCurrentView(item.id)}
                           tooltip={flags.tooltips ? item.label : undefined}
-                          className="gap-3"
+                          className="gap-3 transition-colors rounded-lg data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold"
                         >
                           {item.icon}
-                          <span>{item.label}</span>
+                          <span className="text-xs">{item.label}</span>
                         </SidebarMenuButton>
                         {item.badge ? (
-                          <SidebarMenuBadge className="bg-primary text-primary-foreground">
+                          <SidebarMenuBadge className="bg-primary text-primary-foreground font-semibold tabular-nums text-[11px]">
                             {item.badge}
                           </SidebarMenuBadge>
                         ) : null}
@@ -573,9 +584,9 @@ export default function AppShell() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
-                  <span className="text-sm font-medium text-foreground">{user?.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {user?.empId} · {user?.department} · {user?.floor}
+                  <span className="text-xs font-semibold text-foreground">{user?.name}</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {user?.empId} · {user?.department}
                   </span>
                 </div>
               </SidebarMenuButton>
@@ -584,10 +595,10 @@ export default function AppShell() {
               <SidebarMenuButton
                 onClick={handleLogout}
                 tooltip="Log out"
-                className="gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/8"
+                className="gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="size-4" />
-                <span className="group-data-[collapsible=icon]:hidden">Sign out</span>
+                <span className="group-data-[collapsible=icon]:hidden text-xs">Sign out</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -599,7 +610,7 @@ export default function AppShell() {
       {/* Main content area */}
       <SidebarInset>
         {/* Header bar */}
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/70 bg-card/90 px-4 backdrop-blur-md">
           <SidebarTrigger className="-ml-1" />
 
           <Separator orientation="vertical" className="h-6" />
@@ -607,29 +618,29 @@ export default function AppShell() {
           <div className="flex items-center gap-2">
             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-foreground">{viewInfo.label}</h2>
+                <h2 className="text-sm font-bold tracking-tight text-foreground">{viewInfo.label}</h2>
                 {!isOnline && (
-                  <Badge variant="outline" className="h-5 px-1.5 border-red-500/50 bg-red-500/10 text-red-400 gap-1 animate-pulse text-[10px]">
+                  <Badge variant="pending" className="h-5 px-1.5 gap-1 text-[10px]">
                     <WifiOff className="size-2.5" />
                     Offline
                   </Badge>
                 )}
               </div>
-              <div className="hidden sm:flex items-center gap-2">
-                <ChevronRight className="size-3 text-muted-foreground/50" />
-                <span className="text-xs text-muted-foreground">{viewInfo.subtitle}</span>
+              <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ChevronRight className="size-3 text-muted-foreground/40" />
+                <span>{viewInfo.subtitle}</span>
               </div>
             </div>
           </div>
 
           <div className="ml-auto flex items-center gap-3">
-            <div className="hidden sm:flex items-center rounded-full border border-white/40 bg-white/20 backdrop-blur-sm px-3 py-1 text-[10px] font-medium text-muted-foreground">
-              Internal Tool · v1.0
+            <div className="hidden sm:flex items-center rounded-full border border-border/60 bg-secondary/50 backdrop-blur-sm px-3 py-1 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+              KG_Inventra ERP
             </div>
 
             <NotificationCenter />
 
-            <div className="hidden md:flex items-center gap-2.5 pl-3 border-l border-border">
+            <div className="hidden md:flex items-center gap-2.5 pl-3 border-l border-border/60">
               <Avatar className="size-7 ring-1 ring-border">
                 <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-semibold">
                   {initials}
@@ -637,7 +648,7 @@ export default function AppShell() {
               </Avatar>
               <div className="flex flex-col leading-none">
                 <span className="text-xs font-semibold text-foreground">{user?.name}</span>
-                <span className="text-[10px] text-muted-foreground capitalize">{user?.role} · {user?.department}</span>
+                <span className="text-[10px] text-muted-foreground capitalize">{user?.role} · {user?.department || 'Store'}</span>
               </div>
             </div>
           </div>

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError, ApiError } from '@/lib/api-utils';
+import { deleteImage, saveImage } from '@/lib/image-storage';
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -31,14 +30,8 @@ export async function POST(
 
     const ext = file.type.split('/')[1].replace('jpeg', 'jpg');
     const filename = `${id}-${Date.now()}.${ext}`;
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'items');
-
-    await fs.mkdir(uploadDir, { recursive: true });
-
     const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(path.join(uploadDir, filename), buffer);
-
-    const photoUrl = `/uploads/items/${filename}`;
+    const photoUrl = await saveImage(buffer, filename, file.type);
     await db.item.update({ where: { id }, data: { photoUrl } });
 
     return NextResponse.json({ photoUrl });
@@ -61,10 +54,7 @@ export async function DELETE(
     if (!item) throw new ApiError(404, 'Item not found', 'NOT_FOUND');
 
     if (item.photoUrl) {
-      const filePath = path.join(process.cwd(), 'public', item.photoUrl);
-      await fs.unlink(filePath).catch(() => {
-        // Ignore missing-file errors — DB record should still be cleared
-      });
+      await deleteImage(item.photoUrl);
     }
 
     await db.item.update({ where: { id }, data: { photoUrl: null } });

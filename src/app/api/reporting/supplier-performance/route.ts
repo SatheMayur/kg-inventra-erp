@@ -3,10 +3,12 @@ import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-utils';
 
+import { PO_STATUS } from '@/lib/po-status';
+
 // GET /api/reporting/supplier-performance — per-supplier delivery time + fulfillment accuracy.
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorize(request, ['admin']);
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN', 'PURCHASE_USER', 'ACCOUNTS_USER', 'MANAGEMENT']);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const suppliers = await db.supplier.findMany({
@@ -17,11 +19,19 @@ export async function GET(request: NextRequest) {
       .map((s) => {
         const pos = s.pos;
         const totalValue = pos.reduce((sum, p) => sum + p.totalAmount, 0);
-        const received = pos.filter((p) => p.status === 'RECEIVED' && p.receivedAt);
-
-        const delays = received.map((p) =>
-          Math.max(0, Math.round((p.receivedAt!.getTime() - p.createdAt.getTime()) / 86400000))
+        const received = pos.filter((p) =>
+          [
+            PO_STATUS.FULLY_RECEIVED,
+            PO_STATUS.PARTIALLY_RECEIVED,
+            PO_STATUS.INVOICE_PENDING,
+            PO_STATUS.CLOSED
+          ].includes(p.status as any) && p.receivedAt
         );
+
+        const delays = received.map((p) => {
+          const targetDate = p.expectedDeliveryDate || p.createdAt;
+          return Math.max(0, Math.round((p.receivedAt!.getTime() - targetDate.getTime()) / 86400000));
+        });
         const avgDeliveryDays = delays.length
           ? Math.round((delays.reduce((a, b) => a + b, 0) / delays.length) * 10) / 10
           : null;

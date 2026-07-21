@@ -1,6 +1,4 @@
 import type { NextConfig } from "next";
-import { execSync } from "child_process";
-import path from "path";
 import withPWA from "@ducanh2912/next-pwa";
 
 const pwaConfig = withPWA({
@@ -15,10 +13,11 @@ const pwaConfig = withPWA({
 
 const nextConfig: NextConfig = {
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   turbopack: {},
-  reactStrictMode: false,
+  allowedDevOrigins: ["127.0.0.1", "localhost", "172.16.47.109", "172.16.47.109:4015"],
+  reactStrictMode: true,
   devIndicators: false,
 
   // Security headers applied to every response

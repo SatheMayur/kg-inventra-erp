@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       .map((item) => {
         const totalConsumed = consumptionMap[item.id] || 0;
         const dailyRate = totalConsumed / 30;
-        const available = item.stock - item.reservedQty;
+        const available = Math.max(0, item.stock - item.reservedQty);
 
         let daysLeft: number | null = null;
         let status: 'critical' | 'warning' | 'ok' | 'insufficient' = 'ok';

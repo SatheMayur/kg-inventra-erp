@@ -11,6 +11,9 @@ export interface Approver {
  * requests from their own department. Ordinary employees cannot approve.
  */
 export function canApproveRequest(user: Approver, requestDepartment: string): boolean {
-  if (user.role === 'admin') return true
-  return user.isDeptHead && user.department === requestDepartment
+  if (user.role === 'admin' || user.role === 'STORE_ADMIN' || user.role === 'MANAGEMENT') return true
+  return (
+    (user.role === 'DEPT_HEAD' || user.isDeptHead) &&
+    user.department === requestDepartment
+  )
 }

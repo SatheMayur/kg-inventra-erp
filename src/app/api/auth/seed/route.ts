@@ -32,7 +32,7 @@ const DEFAULT_USERS = [
   { empId: 'chintan', name: 'Chintan bhai', department: 'Hardware', floor: 'FF-B1', role: 'employee', password: 'pass123', active: true },
   { empId: 'monil', name: 'Monil bhai', department: 'Admin', floor: 'SF-B2', role: 'employee', password: 'pass123', active: true },
   { empId: 'micky', name: 'Micky bhai', department: 'BMS', floor: 'FF-B4', role: 'employee', password: 'pass123', active: true },
-  { empId: 'sandeshr', name: 'Sandesh Rawal', department: 'Program', floor: 'FF-B2', role: 'employee', password: 'pass123', active: true },
+  { empId: 'sandeshr', name: 'Sandesh Rawal', department: 'CLV', floor: 'FF-B2', role: 'DEPT_HEAD', password: 'pass123', active: true, isDeptHead: true },
   { empId: 'program', name: 'Program', department: 'Admin', floor: 'GF-B3', role: 'employee', password: 'pass123', active: true },
   { empId: 'kirtichand', name: 'Kirti Chand', department: 'HR', floor: 'SF02', role: 'employee', password: 'pass123', active: true },
   { empId: 'jitendra', name: 'Jitendra', department: 'R & D', floor: 'SF-B2', role: 'employee', password: 'pass123', active: true },
@@ -81,6 +81,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
   }
 
+  // Explicit ALLOW_SEED check to prevent accidental developer triggers
+  if (process.env.ALLOW_SEED !== 'true') {
+    return NextResponse.json({ error: 'Database seeding is disabled. Set ALLOW_SEED=true to enable.' }, { status: 403 });
+  }
+
   // 2. If users already exist, require admin auth to prevent credential reset
   const userCount = await db.user.count();
   if (userCount > 0) {
@@ -109,7 +114,15 @@ export async function POST(request: NextRequest) {
       for (const user of hashedUsers) {
         await tx.user.upsert({
           where: { empId: user.empId },
-          update: { password: user.password },
+          update: {
+            name: user.name,
+            department: user.department,
+            floor: user.floor,
+            role: user.role,
+            isDeptHead: user.isDeptHead || false,
+            password: user.password,
+            phone: user.phone,
+          },
           create: user,
         });
       }

@@ -22,7 +22,7 @@ type Tx = Prisma.TransactionClient
 type InstanceWithSteps = Prisma.ApprovalInstanceGetPayload<{ include: { steps: true } }>
 
 /** Identity of the user acting on a step — `id` blocks self-approval, `role` matches the step. */
-export type StepActor = { id: string; role: string }
+export type StepActor = { id: string; role: string; isDeptHead?: boolean }
 
 export type StartApprovalArgs = {
   moduleName: string
@@ -112,7 +112,10 @@ export async function approveStep(tx: Tx, { instanceId, user, remarks }: StepAct
     throw new ApiError(403, 'You cannot approve your own request', 'FORBIDDEN')
   }
   const step = currentStepOf(instance)
-  if (user.role !== step.approverRole) {
+  const isSuperUser = user.role === 'admin' || user.role === 'STORE_ADMIN' || user.role === 'MANAGEMENT'
+  const isRoleMatched = user.role === step.approverRole || (step.approverRole === 'DEPT_HEAD' && (user.role === 'DEPT_HEAD' || !!user.isDeptHead))
+
+  if (!isSuperUser && !isRoleMatched) {
     throw new ApiError(403, `This approval step requires the ${step.approverRole} role`, 'FORBIDDEN')
   }
 
@@ -138,7 +141,11 @@ export async function approveStep(tx: Tx, { instanceId, user, remarks }: StepAct
 export async function rejectStep(tx: Tx, { instanceId, user, remarks }: StepActionArgs): Promise<StepResult> {
   const instance = await loadPendingInstance(tx, instanceId)
   const step = currentStepOf(instance)
-  if (user.role !== step.approverRole) {
+  
+  const isRejectSuperUser = user.role === 'admin' || user.role === 'STORE_ADMIN' || user.role === 'MANAGEMENT'
+  const isRejectRoleMatched = user.role === step.approverRole || (step.approverRole === 'DEPT_HEAD' && (user.role === 'DEPT_HEAD' || !!user.isDeptHead))
+
+  if (!isRejectSuperUser && !isRejectRoleMatched) {
     throw new ApiError(403, `This approval step requires the ${step.approverRole} role`, 'FORBIDDEN')
   }
 

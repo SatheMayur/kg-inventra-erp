@@ -143,30 +143,24 @@ function StatCard({
 // ─── Status / Type Badges ────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    Pending: 'border-sky-500/20 text-sky-700 bg-sky-500/10',
-    Approved: 'border-amber-500/20 text-amber-700 bg-amber-500/10',
-    Issued: 'border-emerald-500/20 text-emerald-700 bg-emerald-500/10',
-    Rejected: 'border-rose-500/20 text-rose-700 bg-rose-500/10',
-    Cancelled: 'border-stone-500/20 text-stone-500 bg-stone-500/10',
-  }
-  return (
-    <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 font-medium', map[status] ?? map.Pending)}>
-      {status}
-    </Badge>
-  )
+  if (status === 'Approved') return <Badge variant="warning">Approved</Badge>
+  if (status === 'Issued') return <Badge variant="success">Issued</Badge>
+  if (status === 'Pending') return <Badge variant="pending">Pending</Badge>
+  if (status === 'Rejected') return <Badge variant="destructive">Rejected</Badge>
+  if (status === 'Cancelled') return <Badge variant="draft">Cancelled</Badge>
+  return <Badge variant="outline">{status}</Badge>
 }
 
 function TypeBadge({ type }: { type: 'IN' | 'OUT' }) {
   if (type === 'IN') {
     return (
-      <Badge variant="outline" className="border-emerald-500/20 text-emerald-700 bg-emerald-500/10 text-[10px] gap-1 px-1.5 py-0 font-medium">
+      <Badge variant="success" className="gap-1 px-1.5 py-0">
         <ArrowDown className="size-2.5" />IN
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="border-rose-500/20 text-rose-700 bg-rose-500/10 text-[10px] gap-1 px-1.5 py-0 font-medium">
+    <Badge variant="destructive" className="gap-1 px-1.5 py-0">
       <ArrowUp className="size-2.5" />OUT
     </Badge>
   )
@@ -177,7 +171,7 @@ function TypeBadge({ type }: { type: 'IN' | 'OUT' }) {
 function RiskBadge({ status, daysLeft }: { status: StockoutRiskItem['status']; daysLeft: number | null }) {
   if (status === 'critical' || (daysLeft !== null && daysLeft <= 3)) {
     return (
-      <Badge variant="outline" className="border-rose-500/20 text-rose-700 bg-rose-500/10 text-[10px] font-bold gap-1">
+      <Badge variant="destructive" className="gap-1">
         <Flame className="size-2.5" />
         {daysLeft !== null ? `${daysLeft}d left` : 'Critical'}
       </Badge>
@@ -185,14 +179,14 @@ function RiskBadge({ status, daysLeft }: { status: StockoutRiskItem['status']; d
   }
   if (status === 'warning' || (daysLeft !== null && daysLeft <= 7)) {
     return (
-      <Badge variant="outline" className="border-amber-500/20 text-amber-700 bg-amber-500/10 text-[10px] font-bold gap-1">
+      <Badge variant="warning" className="gap-1">
         <Timer className="size-2.5" />
         {daysLeft !== null ? `${daysLeft}d left` : 'Warning'}
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="border-emerald-500/20 text-emerald-700 bg-emerald-500/10 text-[10px] font-medium">
+    <Badge variant="success">
       In Stock
     </Badge>
   )
@@ -391,7 +385,7 @@ function AdminDashboard({ data, risk, topItems, period }: AdminDashboardProps) {
                 <p className="text-xs text-muted-foreground">All stock levels healthy</p>
               </div>
             ) : (
-              <ScrollArea className="h-[280px]">
+              <div className="h-[280px] overflow-y-auto pr-2">
                 <div className="space-y-2 pr-2">
                   {/* Prioritize risk items, fall back to lowStockItems */}
                   {(risk.filter(r => r.status !== 'ok' && r.status !== 'insufficient').length > 0
@@ -450,7 +444,7 @@ function AdminDashboard({ data, risk, topItems, period }: AdminDashboardProps) {
                     )
                   })}
                 </div>
-              </ScrollArea>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -662,6 +656,7 @@ function EmployeeDashboard({ data }: { data: DashboardData }) {
 export default function DashboardView() {
   const user = useAppStore((s) => s.user)
   const setPendingCount = useAppStore((s) => s.setPendingCount)
+  const isAdmin = !!user && ['admin', 'STORE_ADMIN', 'STORE_OPERATOR', 'MANAGEMENT'].includes(user.role)
 
   const [data, setData] = useState<DashboardData | null>(null)
   const [risk, setRisk] = useState<StockoutRiskItem[]>([])
@@ -675,8 +670,8 @@ export default function DashboardView() {
     setLoading(true)
     setError(null)
     try {
-      const params = user.role === 'employee' ? { userId: user.id } : undefined
-      if (user.role === 'admin') {
+      const params = !isAdmin ? { userId: user.id } : undefined
+      if (isAdmin) {
         const [dashRes, riskRes, topRes, periodRes] = await Promise.all([
           api.reporting.dashboard(params),
           api.reporting.stockoutRisk().catch(() => [] as StockoutRiskItem[]),
@@ -687,7 +682,7 @@ export default function DashboardView() {
         setRisk(riskRes)
         setTopItems(topRes)
         setPeriod(periodRes)
-        setPendingCount(dashRes.pendingCount)
+        setPendingCount(dashRes.pendingCount + dashRes.approvedCount)
       } else {
         const dashRes = await api.reporting.dashboard(params)
         setData(dashRes)
@@ -729,10 +724,10 @@ export default function DashboardView() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-bold tracking-tight">
-            {user?.role === 'admin' ? 'System Intelligence' : 'My Overview'}
+            {isAdmin ? 'System Intelligence' : 'My Overview'}
           </h3>
           <p className="text-xs text-muted-foreground/60 mt-0.5">
-            {user?.role === 'admin'
+            {isAdmin
               ? 'Real-time inventory health, alerts, and operational metrics'
               : 'Your active requests and inventory activity'}
           </p>
@@ -747,7 +742,7 @@ export default function DashboardView() {
         </button>
       </div>
 
-      {user?.role === 'employee'
+      {!isAdmin
         ? <EmployeeDashboard data={data} />
         : <AdminDashboard data={data} risk={risk} topItems={topItems} period={period} />
       }

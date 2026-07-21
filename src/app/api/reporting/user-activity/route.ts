@@ -5,7 +5,7 @@ import { handleApiError } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await authorize(request, ['admin']);
+    const auth = await authorize(request, ['admin', 'STORE_ADMIN', 'MANAGEMENT']);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { searchParams } = new URL(request.url);

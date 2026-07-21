@@ -4,6 +4,8 @@ import { authorize } from '@/lib/auth';
 import { ApiError, handleApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
 import { canApproveRequest } from '@/lib/approval';
+import { flattenRequest } from '@/lib/request-fulfillment';
+import { SR_STATUS } from '@/lib/sr-status';
 
 export async function PATCH(
   request: NextRequest,
@@ -15,9 +17,9 @@ export async function PATCH(
     const { id } = await params;
 
     const result = await db.$transaction(async (tx) => {
-      const req = await tx.request.findUnique({ where: { id } });
+      const req = await tx.request.findUnique({ where: { id }, include: { lines: true } });
       if (!req) throw new ApiError(404, 'Request not found', 'NOT_FOUND');
-      if (req.status !== 'Approved') {
+      if (req.status !== SR_STATUS.APPROVED) {
         throw new ApiError(400, 'Only approved requests can be marked ready', 'BAD_REQUEST');
       }
       const u = await tx.user.findUnique({ where: { id: auth.user!.id } });
@@ -27,19 +29,20 @@ export async function PATCH(
       )) {
         throw new ApiError(403, 'Not authorized for this department', 'FORBIDDEN');
       }
-      return tx.request.update({ where: { id }, data: { status: 'ReadyForPickup' } });
+      return tx.request.update({ where: { id }, data: { status: SR_STATUS.READY_FOR_PICKUP }, include: { lines: true } });
     });
 
-    // Reuse existing audit vocabulary; metadata.step records the transition.
+    const flat = flattenRequest(result);
+
     await createAuditLog({
-      action: 'ISSUE_REQUEST',
+      action: 'READY_REQUEST',
       user: auth.user,
       targetId: id,
-      targetName: result.itemName,
-      metadata: { step: 'ready_for_pickup', qty: result.qty },
+      targetName: flat.itemName,
+      metadata: { step: 'ready_for_pickup' },
     });
 
-    return NextResponse.json({ request: result });
+    return NextResponse.json({ request: flat });
   } catch (error) {
     return handleApiError(error);
   }

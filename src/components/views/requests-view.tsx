@@ -25,10 +25,15 @@ import { RequestsTable } from '@/components/requests/RequestsTable'
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog'
 import { NewRequestDialog } from '@/components/requests/NewRequestDialog'
 
-export default function RequestsView() {
+export default function RequestsView({ title }: { title?: string }) {
   const user = useAppStore((s) => s.user)
   const setPendingCount = useAppStore((s) => s.setPendingCount)
-  const isAdmin = user?.role === 'admin'
+  const role = user?.role ?? ''
+  const isAdmin = role === 'admin'
+  const isDeptHead = role === 'DEPT_HEAD' || !!user?.isDeptHead
+  const canIssueRequest = ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(role)
+  const canCreatePO = ['admin', 'STORE_ADMIN', 'PURCHASE_USER'].includes(role)
+  const canSeeWorkflowRequests = canIssueRequest || canCreatePO || isDeptHead || role === 'MANAGEMENT'
 
   // Data
   const [requests, setRequests] = useState<RequestResponse[]>([])
@@ -52,14 +57,14 @@ export default function RequestsView() {
   const fetchRequests = useCallback(async () => {
     try {
       const params: { userId?: string; status?: string } = {}
-      if (!isAdmin && user) params.userId = user.id
+      if (!canSeeWorkflowRequests && user) params.userId = user.id
       if (statusFilter !== 'all') params.status = statusFilter
       const data = await api.requests.list(params)
       setRequests(data)
     } catch {
       toast.error('Failed to load requests')
     }
-  }, [isAdmin, user, statusFilter])
+  }, [canSeeWorkflowRequests, user, statusFilter])
 
   const fetchItems = useCallback(async () => {
     try {
@@ -170,10 +175,8 @@ export default function RequestsView() {
 
   // ── Stock helper ───────────────────────
 
-  const detailItem = detailReq ? items.find((i) => i.id === detailReq.itemId) : null
-  // For an existing request, its quantity is already in reservedQty.
-  // We add it back to show what's available specifically for THIS request.
-  const detailAvailable = detailItem ? detailItem.stock - (detailItem.reservedQty - detailReq!.qty) : 0
+  const detailItem = detailReq ? items.find((i) => i.id === (detailReq.lines?.[0]?.itemId ?? detailReq.itemId)) : null
+  const detailAvailable = detailItem ? detailItem.stock - (detailItem.reservedQty - (detailReq!.lines?.[0]?.availableQty ?? 0)) : 0
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -184,7 +187,7 @@ export default function RequestsView() {
             <ClipboardList className="size-5 text-primary" />
           </div>
           <div>
-            <h3 className="text-xl font-bold tracking-tight">{isAdmin ? 'All Requests' : 'My Requests'}</h3>
+            <h3 className="text-xl font-bold tracking-tight">{title ?? (isAdmin ? 'All Requests' : 'My Requests')}</h3>
             {!loading && (
               <p className="text-xs text-muted-foreground mt-0.5">
                 Managing {filtered.length} active request{filtered.length !== 1 ? 's' : ''}
@@ -223,6 +226,7 @@ export default function RequestsView() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="Pending">Pending</SelectItem>
               <SelectItem value="Approved">Approved</SelectItem>
+              <SelectItem value="CONVERTED_TO_PO">Converted to PO</SelectItem>
               <SelectItem value="Issued">Issued</SelectItem>
               <SelectItem value="Rejected">Rejected</SelectItem>
               <SelectItem value="Cancelled">Cancelled</SelectItem>
@@ -246,6 +250,13 @@ export default function RequestsView() {
         request={detailReq}
         onOpenChange={(open) => !open && setDetailReq(null)}
         isAdmin={isAdmin}
+        canIssueRequest={canIssueRequest}
+        canCreatePO={canCreatePO}
+        canApprove={
+          isAdmin || 
+          ((role === 'DEPT_HEAD' || user?.isDeptHead) && 
+           detailReq?.department === user?.department)
+        }
         item={detailItem ?? undefined}
         availableStock={detailAvailable}
         actionLoading={actionLoading}
@@ -255,6 +266,12 @@ export default function RequestsView() {
         onIssue={() => {
           setDetailReq(null)
           useAppStore.getState().setCurrentView('issuance')
+        }}
+        onCreatePO={() => {
+          const requestNumber = detailReq?.requestNumber || (detailReq ? `SR-${detailReq.id.slice(-6).toUpperCase()}` : 'this requisition')
+          setDetailReq(null)
+          useAppStore.getState().setCurrentView('purchase-order-process')
+          toast.info(`Select ${requestNumber} in the PO screen to create the order`)
         }}
       />
 

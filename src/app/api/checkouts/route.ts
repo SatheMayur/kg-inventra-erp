@@ -25,6 +25,8 @@ export async function GET(request: NextRequest) {
     const itemId = searchParams.get('itemId');
 
     const where: Record<string, unknown> = {};
+    const canManageCheckouts = ['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(auth.user!.role);
+    if (!canManageCheckouts) where.userId = auth.user!.id;
     if (itemId) where.itemId = itemId;
     // OVERDUE is computed — filter ACTIVE from DB then classify
     if (statusFilter === 'RETURNED') {
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
         delta: -validated.qty,
         reference: `Checkout ${created.id}`,
         userId: auth.user!.id,
+        subType: 'ISSUE',
       });
 
       await checkReorder(tx, validated.itemId);

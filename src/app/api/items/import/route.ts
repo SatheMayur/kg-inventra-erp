@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-utils';
 import { createAuditLog } from '@/lib/audit';
+import { assertSpreadsheetSize } from '@/lib/upload-limits';
 
 // Normalise a header string: lowercase, strip spaces/underscores
 function normaliseKey(k: string): string {
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
     if (!file || typeof file === 'string') {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
+    assertSpreadsheetSize(file);
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

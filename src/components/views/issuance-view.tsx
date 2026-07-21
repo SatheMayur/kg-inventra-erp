@@ -44,25 +44,32 @@ import { toast } from 'sonner'
 type Status = RequestResponse['status']
 
 function statusBadge(status: Status) {
-  const map: Record<Status, string> = {
-    Pending: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
-    Approved: 'bg-sky-500/10 text-sky-700 border-sky-500/20',
-    PartiallyIssued: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/20',
-    ReadyForPickup: 'bg-violet-500/10 text-violet-700 border-violet-500/20',
-    Issued: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
-    Rejected: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
-    Cancelled: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
+  const normalized = status.toUpperCase().replace(/\s+/g, '_')
+  const map: Record<string, string> = {
+    PENDING: 'bg-amber-500/10 text-amber-700 border-amber-500/20',
+    APPROVED: 'bg-sky-500/10 text-sky-700 border-sky-500/20',
+    PARTIALLYISSUED: 'bg-cyan-500/10 text-cyan-700 border-cyan-500/20',
+    READYFORPICKUP: 'bg-violet-500/10 text-violet-700 border-violet-500/20',
+    CONVERTED_TO_PO: 'bg-pink-500/10 text-pink-700 border-pink-500/20',
+    ISSUED: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20',
+    REJECTED: 'bg-rose-500/10 text-rose-700 border-rose-500/20',
+    CANCELLED: 'bg-stone-500/10 text-stone-500 border-stone-500/20',
   }
   // Display-only label mapping; the stored status value is unchanged.
-  const labels: Partial<Record<Status, string>> = {
-    Issued: 'Completed',
-    PartiallyIssued: 'Partially Issued',
+  const labels: Record<string, string> = {
+    ISSUED: 'Completed',
+    PARTIALLYISSUED: 'Partially Issued',
+    CONVERTED_TO_PO: 'Converted to PO',
   }
   return (
-    <Badge variant="outline" className={`text-xs ${map[status]}`}>
-      {labels[status] ?? status}
+    <Badge variant="outline" className={`text-xs ${map[normalized] ?? 'bg-muted/50 text-muted-foreground border-muted-foreground/20'}`}>
+      {labels[normalized] ?? status}
     </Badge>
   )
+}
+
+function isIssuableStatus(status: string) {
+  return ['Approved', 'ReadyForPickup', 'PartiallyIssued', 'CONVERTED_TO_PO'].includes(status)
 }
 
 function formatDate(d: string | null) {
@@ -110,9 +117,9 @@ export default function IssuanceView() {
     if (issueReq.lines && issueReq.lines.length > 0) {
       issueReq.lines.forEach((l) => {
         if (l.status === 'Approved' || l.status === 'PartiallyIssued') {
-          const remaining = l.approvedQty - l.issuedQty
-          if (remaining > 0) {
-            initial[l.id] = String(remaining)
+          const readyQty = getLineReadyQty(l)
+          if (readyQty > 0) {
+            initial[l.id] = String(readyQty)
           }
         }
       })
@@ -137,18 +144,22 @@ export default function IssuanceView() {
 
   const fetchRequests = useCallback(async () => {
     try {
-      // Fetch both Pending and Approved requests
-      const [pending, approved, ready] = await Promise.all([
+      // Fetch workflow statuses that can still need store action.
+      const [pending, approved, converted, partial, ready] = await Promise.all([
         api.requests.list({ status: 'Pending' }),
         api.requests.list({ status: 'Approved' }),
+        api.requests.list({ status: 'CONVERTED_TO_PO' }),
+        api.requests.list({ status: 'PartiallyIssued' }),
         api.requests.list({ status: 'ReadyForPickup' }),
       ])
-      // Sort: Pending, then Approved, then ReadyForPickup; within each, newest first
+      // Sort by workflow stage; within each, newest first.
       const byNewest = (a: RequestResponse, b: RequestResponse) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       const sorted = [
         ...[...pending].sort(byNewest),
         ...[...approved].sort(byNewest),
+        ...[...converted].sort(byNewest),
+        ...[...partial].sort(byNewest),
         ...[...ready].sort(byNewest),
       ]
       setRequests(sorted)
@@ -201,13 +212,30 @@ export default function IssuanceView() {
     return item.stock - (item.reservedQty - requestedQty)
   }
 
+  function getLineReadyQty(line: RequestResponse['lines'][number]): number {
+    const remaining = Math.max(0, line.approvedQty - line.issuedQty)
+    const reservedReady = Math.max(0, (line.availableQty ?? 0) - line.issuedQty)
+    return Math.min(remaining, reservedReady)
+  }
+
+  function getRequestReadyQty(req: RequestResponse): number {
+    if (req.lines && req.lines.length > 0) {
+      return req.lines.reduce((sum, line) => sum + getLineReadyQty(line), 0)
+    }
+    return Math.max(0, getLineAvailable(req.itemId, req.qty))
+  }
+
+  function hasIssuableQty(req: RequestResponse): boolean {
+    return getRequestReadyQty(req) > 0
+  }
+
   function isRequestSufficient(req: RequestResponse): boolean {
     if (req.lines && req.lines.length > 0) {
       return req.lines.every((line) => {
         if (line.status === 'Rejected' || line.status === 'Cancelled') return true
         const remaining = line.approvedQty - line.issuedQty
         if (remaining <= 0) return true
-        return getLineAvailable(line.itemId, remaining) >= remaining
+        return getLineReadyQty(line) >= remaining
       })
     }
     // Legacy fallback
@@ -283,7 +311,7 @@ export default function IssuanceView() {
               toast.error(`Cannot issue more than approved remaining (${maxAllowed}) for ${line.itemName}`)
               return
             }
-            const avail = getLineAvailable(line.itemId, maxAllowed)
+            const avail = getLineReadyQty(line)
             if (qty > avail) {
               toast.error(`Insufficient stock for ${line.itemName}. Max available: ${avail}`)
               return
@@ -345,7 +373,7 @@ export default function IssuanceView() {
   async function handleIssueAllApproved() {
     if (!user) return
     const approvedWithStock = requests.filter(
-      (r) => r.status === 'Approved' && isRequestSufficient(r)
+      (r) => isIssuableStatus(r.status) && isRequestSufficient(r)
     )
     if (approvedWithStock.length === 0) {
       toast.info('No approved requests with sufficient stock')
@@ -395,8 +423,6 @@ export default function IssuanceView() {
   // ── Issue dialog data ────────────────────────────────────
 
   const issueItem = issueReq ? getLineItem(issueReq.itemId) : null
-  const issueAvailable = issueItem ? issueItem.stock - (issueItem.reservedQty - issueReq!.qty) : 0
-  const stockAfterIssue = (issueItem?.stock ?? 0) - (issueReq?.qty ?? 0)
 
   // ── Render ───────────────────────────────────────────────
 
@@ -412,7 +438,7 @@ export default function IssuanceView() {
           <Badge variant="outline" className="text-xs border-border text-muted-foreground">
             {requests.length} pending
           </Badge>
-          {requests.some((r) => r.status === 'Approved' && getLineAvailable(r.itemId, r.qty) >= r.qty) && (
+          {requests.some((r) => isIssuableStatus(r.status) && isRequestSufficient(r)) && (
             <Button
               size="sm"
               className="gap-1.5 bg-emerald-600 hover:bg-emerald-500/100 text-white"
@@ -489,11 +515,13 @@ export default function IssuanceView() {
               </TableHeader>
               <TableBody>
                 {filtered.map((req) => {
-                  const sufficient = isRequestSufficient(req)
                   const available = req.lines && req.lines.length > 1
                     ? '—'
                     : getLineAvailable(req.itemId, req.qty)
                   const isLoading = actionLoading === req.id
+                  const readyQty = getRequestReadyQty(req)
+                  const hasReadyQty = hasIssuableQty(req)
+                  const displayAvailable = req.lines && req.lines.length > 0 ? `${readyQty} ready` : `${available}`
 
                   return (
                     <TableRow
@@ -510,15 +538,11 @@ export default function IssuanceView() {
                       <TableCell>
                         <span
                           className={`text-sm font-medium ${
-                            sufficient ? 'text-emerald-700' : 'text-rose-700'
+                            hasReadyQty ? 'text-emerald-700' : 'text-rose-700'
                           }`}
                         >
-                          {req.lines && req.lines.length > 1 ? (
-                            sufficient ? 'Stock Available' : 'Shortage'
-                          ) : (
-                            `${available}`
-                          )}
-                          {!sufficient && (
+                          {displayAvailable}
+                          {!hasReadyQty && (
                             <AlertTriangle className="inline size-3 ml-1 -mt-0.5" />
                           )}
                         </span>
@@ -561,7 +585,7 @@ export default function IssuanceView() {
                               </Button>
                             </>
                           )}
-                          {(req.status === 'Approved' || req.status === 'ReadyForPickup') && (
+                          {isIssuableStatus(req.status) && (
                             <>
                               {req.status === 'Approved' && (
                                 <Button
@@ -577,7 +601,7 @@ export default function IssuanceView() {
                               <Button
                                 size="sm"
                                 className="h-7 px-2.5 gap-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                                disabled={!!actionLoading || !sufficient}
+                                disabled={!!actionLoading || !hasReadyQty}
                                 onClick={() => setIssueReq(req)}
                               >
                                 {isLoading ? (
@@ -587,20 +611,22 @@ export default function IssuanceView() {
                                 )}
                                 <span className="hidden sm:inline">Issue</span>
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 px-2 gap-1 text-rose-700 hover:text-rose-800 hover:bg-rose-500/10"
-                                disabled={!!actionLoading}
-                                onClick={() => handleReject(req.id)}
-                              >
-                                {isLoading ? (
-                                  <Loader2 className="size-3.5 animate-spin" />
-                                ) : (
-                                  <X className="size-3.5" />
-                                )}
-                                <span className="hidden sm:inline">Reject</span>
-                              </Button>
+                              {req.status === 'Approved' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 gap-1 text-rose-700 hover:text-rose-800 hover:bg-rose-500/10"
+                                  disabled={!!actionLoading}
+                                  onClick={() => handleReject(req.id)}
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <X className="size-3.5" />
+                                  )}
+                                  <span className="hidden sm:inline">Reject</span>
+                                </Button>
+                              )}
                             </>
                           )}
                         </div>
@@ -668,7 +694,7 @@ export default function IssuanceView() {
                           issueReq.lines.map((line) => {
                             if (line.status === 'Rejected' || line.status === 'Cancelled') return null
                             const maxAllowed = line.approvedQty - line.issuedQty
-                            const avail = getLineAvailable(line.itemId, maxAllowed)
+                            const avail = getLineReadyQty(line)
                             return (
                               <tr key={line.id} className="hover:bg-muted/10">
                                 <td className="p-2 font-medium">{line.itemName}</td>

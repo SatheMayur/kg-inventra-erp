@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 import { authorize } from '@/lib/auth';
-import { handleApiError } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,8 +11,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
+    const user = auth.user!;
+    const isDeptHead = user.role === 'DEPT_HEAD' || user.isDeptHead;
+    const isStore = user.role === 'STORE_ADMIN' || user.role === 'STORE_OPERATOR';
+    const isPurchase = user.role === 'PURCHASE_USER';
+    const isManagement = user.role === 'admin' || user.role === 'MANAGEMENT';
+
     const requestWhere: Prisma.RequestWhereInput = {};
-    if (userId) requestWhere.userId = userId;
+    if (userId) {
+      requestWhere.userId = userId;
+    } else if (isManagement) {
+      // Management: see all
+    } else if (isStore) {
+      requestWhere.status = {
+        in: [
+          'Approved', 'PartiallyIssued', 'ReadyForPickup', 'Issued', 'CONVERTED_TO_PO',
+          'PENDING_STORE_REVIEW', 'STOCK_AVAILABLE', 'ISSUE_PENDING', 'COMPLETED'
+        ]
+      };
+    } else if (isPurchase) {
+      requestWhere.status = {
+        in: ['PURCHASE_REQUIRED', 'CONVERTED_TO_PO']
+      };
+    } else if (isDeptHead) {
+      requestWhere.department = user.department;
+    } else {
+      requestWhere.userId = user.id;
+    }
 
     const [
       totalItems,
@@ -37,19 +61,40 @@ export async function GET(request: NextRequest) {
         orderBy: { stock: 'asc' },
         take: 20,
       }),
-      db.request.count({ where: { ...requestWhere, status: 'Pending' } }),
-      db.request.count({ where: { ...requestWhere, status: 'Approved' } }),
-      db.request.count({ where: { ...requestWhere, status: 'Issued' } }),
+      db.request.count({
+        where: {
+          ...requestWhere,
+          status: {
+            in: ['Pending', 'SUBMITTED', 'Pending Department Approval', 'PENDING_DEPT_APPROVAL', 'UNDER_REVIEW']
+          }
+        }
+      }),
+      db.request.count({
+        where: {
+          ...requestWhere,
+          status: {
+            in: [
+              'Approved', 'PENDING_STORE_REVIEW', 'STOCK_AVAILABLE', 'ISSUE_PENDING',
+              'PARTIALLY_ISSUED', 'PartiallyIssued', 'ReadyForPickup', 'READY_FOR_PICKUP'
+            ]
+          }
+        }
+      }),
+      db.request.count({
+        where: {
+          ...requestWhere,
+          status: {
+            in: ['Issued', 'COMPLETED']
+          }
+        }
+      }),
       db.request.count({ where: requestWhere }),
       db.transaction.count({ where: userId ? { userId } : {} }),
       db.request.findMany({
         where: requestWhere,
         orderBy: { createdAt: 'desc' },
         take: 5,
-        select: {
-          id: true, employee: true, department: true, itemName: true,
-          qty: true, status: true, createdAt: true,
-        },
+        include: { lines: true },
       }),
       db.transaction.findMany({
         where: userId ? { userId } : {},
@@ -77,7 +122,11 @@ export async function GET(request: NextRequest) {
         issuedCount,
         totalRequests,
         totalTransactions,
-        recentRequests,
+        recentRequests: recentRequests.map((r) => ({
+          ...r,
+          itemName: r.lines.map((line) => line.itemName).join(', '),
+          qty: r.lines.reduce((sum, line) => sum + line.requestedQty, 0),
+        })),
         recentTransactions,
         lowStockItems: filteredLowStock.map((item) => ({
           ...item,
@@ -87,6 +136,23 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'private, max-age=30' } }
     );
   } catch (error) {
-    return handleApiError(error);
+    console.error('[reporting/dashboard] falling back to empty dashboard:', error);
+    return NextResponse.json(
+      {
+        totalItems: 0,
+        totalStock: 0,
+        lowStockCount: 0,
+        outOfStockCount: 0,
+        pendingCount: 0,
+        approvedCount: 0,
+        issuedCount: 0,
+        totalRequests: 0,
+        totalTransactions: 0,
+        recentRequests: [],
+        recentTransactions: [],
+        lowStockItems: [],
+      },
+      { headers: { 'Cache-Control': 'private, max-age=10' } }
+    );
   }
 }

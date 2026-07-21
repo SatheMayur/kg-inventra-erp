@@ -14,16 +14,17 @@ model User {
   department String
   floor      String   @default("")
   role       String   @default("employee") // admin | employee
-  isDeptHead Boolean  @default(false)       // can approve requests for own department
-  password   String   // hashed in production; plaintext for demo
+  isDeptHead Boolean  @default(false) // can approve requests for own department
+  password   String // hashed in production; plaintext for demo
+  phone      String?  @unique // optional phone number for WhatsApp linking
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  requests     Request[]
-  transactions Transaction[]
+  requests      Request[]
+  transactions  Transaction[]
   notifications Notification[]
-  checkouts    ItemCheckout[]
+  checkouts     ItemCheckout[]
 }
 
 model Notification {
@@ -33,180 +34,342 @@ model Notification {
   message   String
   type      String   @default("info") // info | success | warning | error
   read      Boolean  @default(false)
-  link      String?  // Optional link to view details
+  link      String? // Optional link to view details
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 
   @@index([userId, read, createdAt])
 }
 
-model Item {
-  id           String    @id @default(cuid())
-  name         String
-  barcode      String?   @unique
-  category     String
-  unit         String    @default("pcs")
-  stock        Int       @default(0)
-  minStock     Int       @default(10)
-  reservedQty  Int       @default(0)
-  reorderQty   Int       @default(0)   // qty to auto-order when low; 0 disables auto-PO
-  preferredSupplierId String?          // supplier used for auto-generated POs
-  version      Int       @default(1)
-  deletedAt    DateTime?
-  price        Float     @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+model ItemCategory {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  procurementType String   @default("STANDARD") // STANDARD | DAILY | BOTH
+  active          Boolean  @default(true)
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  requests      Request[]
-  transactions  Transaction[]
-  poItems       POItem[]
-  variants      ItemVariant[]
-  transferItems StockTransferItem[]
-  tags          ItemTag[]
-  checkouts     ItemCheckout[]
-  pickListItems PickListItem[]
-  maintenanceSchedules MaintenanceSchedule[]
-  images        ItemImage[]
-  photoUrl      String?   // legacy single photo — kept in sync with primary image thumbnail
-  folder        String?
-  customFields  Json?
+  @@index([active, procurementType])
+  @@map("item_categories")
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  code      String   @unique // canonical unit code, matches canonicalUnit(): kg, g, l, pcs, box ...
+  name      String
+  kind      String   @default("COUNT") // WEIGHT | VOLUME | COUNT | PACK
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+  @@map("units")
+}
+
+model Item {
+  id                       String    @id @default(cuid())
+  name                     String
+  itemCode                 String?   @unique
+  barcode                  String?   @unique
+  category                 String
+  shortName                String?
+  subCategory              String?
+  description              String?
+  unit                     String    @default("pcs")
+  stock                    Float     @default(0)
+  minStock                 Float     @default(10)
+  maxStock                 Float     @default(0)
+  safetyStock              Float     @default(0)
+  reservedQty              Float     @default(0)
+  reorderQty               Float     @default(0) // qty to auto-order when low; 0 disables auto-PO
+  preferredSupplierId      String? // supplier used for auto-generated POs
+  warehouse                String?
+  rack                     String?
+  shelf                    String?
+  bin                      String?
+  hsnCode                  String?
+  gstRate                  Float     @default(0)
+  procurementType          String    @default("STANDARD") // STANDARD | DAILY | BOTH
+  pricingMode              String    @default("LAST_APPROVED_RATE") // DAILY_MARKET_RATE | CONTRACT_RATE | VENDOR_PRICE_LIST | LAST_APPROVED_RATE | MANUAL_QUOTATION | EMERGENCY_PROVISIONAL_RATE
+  itemNature               String    @default("NON_PERISHABLE") // PERISHABLE | NON_PERISHABLE | SERVICE
+  baseUnit                 String?
+  purchaseUnit             String?
+  consumptionUnit          String?
+  unitConversion           Float     @default(1)
+  conversionType           String    @default("NONE") // NONE | FIXED | PACK | VARIABLE_WEIGHT (see src/lib/units.ts)
+  perishable               Boolean   @default(false)
+  shelfLife                Int?
+  storageCondition         String?
+  qualityGradeEnabled      Boolean   @default(false)
+  dailyProcurementEligible Boolean   @default(false)
+  requiresMasterReview     Boolean   @default(false)
+  version                  Int       @default(1)
+  active                   Boolean   @default(true)
+  deletedAt                DateTime?
+  price                    Float     @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  requestLines           RequestLine[]
+  transactions           Transaction[]
+  poItems                POItem[]
+  variants               ItemVariant[]
+  transferItems          StockTransferItem[]
+  tags                   ItemTag[]
+  checkouts              ItemCheckout[]
+  pickListItems          PickListItem[]
+  maintenanceSchedules   MaintenanceSchedule[]
+  images                 ItemImage[]
+  aliases                ItemAlias[]
+  dailyProcurementLines  DailyProcurementLine[]
+  dailyRateEnquiryLines  DailyRateEnquiryLine[]
+  dailyVendorQuotes      DailyVendorQuote[]      @relation("DailyVendorQuoteMatchedItem")
+  dailyVendorAllocations DailyVendorAllocation[]
+  dailySupplyOrderLines  DailySupplyOrderLine[]
+  dailyConversationLines DailyConversationLine[]
+  supplierMappings       SupplierItemMapping[]
+  goodsReceiptItems      GoodsReceiptItem[]
+  photoUrl               String? // legacy single photo — kept in sync with primary image thumbnail
+  folder                 String?
+  customFields           Json?
+
+  importBatchId   String?
+  sourceFileName  String?
+  sourceSheetName String?
+  sourceRowNumber Int?
+  sourceChannel   String  @default("IMPORT")
+  sourceItemName  String?
+  rowHash         String?
+  createdBy       String?
+
+  priceTransactions PriceTransaction[]
 
   // Note: SQLite treats NULLs as distinct in unique constraints, so
   // @@unique([name, category, deletedAt]) won't prevent duplicates where deletedAt IS NULL.
   // The API layer handles uniqueness checks for non-deleted items manually.
   // This index helps with lookups by name+category among active items.
+  @@index([name, category, deletedAt])
+  @@index([procurementType, dailyProcurementEligible, itemNature, active, deletedAt])
 }
 
 model ItemImage {
   id            String   @id @default(cuid())
   itemId        String
-  imagePath     String   // full-resolution original (local path or blob URL)
-  thumbnailPath String   // 150x150 thumbnail
+  imagePath     String // full-resolution original (local path or blob URL)
+  thumbnailPath String // 150x150 thumbnail
   isPrimary     Boolean  @default(false)
-  labelType     String?  // liquids: "front" | "hazard" | "batch"; null for others
+  labelType     String? // liquids: "front" | "hazard" | "batch"; null for others
   sortOrder     Int      @default(0)
   uploadedAt    DateTime @default(now())
 
-  item          Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
   @@index([itemId, isPrimary])
   @@index([itemId, sortOrder])
 }
 
 model Supplier {
-  id        String   @id @default(cuid())
-  name      String
-  contact   String?
-  email     String?
-  category  String?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  gstNumber     String?
+  contactPerson String?
+  phone         String?
+  contact       String?
+  email         String?
+  address       String?
+  category      String?
+  active        Boolean  @default(true)
+  status        String   @default("ACTIVE") // ACTIVE | INACTIVE | BLOCKED
+  paymentTerms  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  pos       PurchaseOrder[]
+  pos                    PurchaseOrder[]
+  dailyRateEnquiries     DailyRateEnquiry[]
+  dailyVendorQuotes      DailyVendorQuote[]
+  dailyVendorAllocations DailyVendorAllocation[]
+  dailySupplyOrders      DailySupplyOrder[]
+  dailyConversations     DailyProcurementConversation[]
+  whatsappMessages       WhatsAppMessage[]
+  itemMappings           SupplierItemMapping[]
+  priceTransactions      PriceTransaction[]
+
+  @@map("suppliers")
 }
 
 model PurchaseOrder {
-  id          String   @id @default(cuid())
-  poNumber    String   @unique
-  supplierId  String
-  status      String   @default("DRAFT") // DRAFT | SENT | RECEIVED | CANCELLED
-  totalAmount Float    @default(0)
-  approvedBy  String?
-  approvedAt  DateTime?
-  autoGenerated Boolean @default(false)
+  id                   String    @id @default(cuid())
+  poNumber             String    @unique
+  supplierId           String
+  status               String    @default("DRAFT") // DRAFT | PENDING_APPROVAL | APPROVED | SENT_TO_SUPPLIER | PARTIALLY_RECEIVED | FULLY_RECEIVED | INVOICE_PENDING | NEEDS_REVIEW | CLOSED | REJECTED | CANCELLED | ON_HOLD  (see src/lib/po-status.ts)
+  totalAmount          Float     @default(0)
+  approvedBy           String?
+  approvedAt           DateTime?
+  autoGenerated        Boolean   @default(false)
   expectedDeliveryDate DateTime?
-  receivedAt  DateTime?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  deliveryDate         DateTime?
+  paymentTerms         String?
+  tax                  Float     @default(0)
+  transportationCost   Float     @default(0)
+  cgstRate             Float     @default(0)
+  sgstRate             Float     @default(0)
+  igstRate             Float     @default(0)
+  createdBy            String?
+  receivedAt           DateTime?
+  notes                String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  linkedSrId           String?
+  sourceType           String    @default("STANDARD") // STANDARD | DAILY_PROCUREMENT
+  internalOnly         Boolean   @default(false)
+  linkedSr             Request?  @relation(fields: [linkedSrId], references: [id])
 
-  supplier    Supplier @relation(fields: [supplierId], references: [id])
-  items       POItem[]
-  invoices    PurchaseInvoice[]
-  challans    DeliveryChallan[]
+  supplier         Supplier          @relation(fields: [supplierId], references: [id])
+  items            POItem[]
+  invoices         PurchaseInvoice[]
+  invoiceIntakes   InvoiceIntake[]
+  challans         DeliveryChallan[]
+  approvalLogs     ApprovalLog[]
+  goodsReceipts    GoodsReceipt[]
+  dailySupplyOrder DailySupplyOrder?
 
   @@index([status, createdAt])
+  @@map("purchase_orders")
 }
 
 model POItem {
-  id              String   @id @default(cuid())
+  id              String @id @default(cuid())
   purchaseOrderId String
   itemId          String
-  qty             Int
-  receivedQty     Int      @default(0)
-  unitPrice       Float    @default(0)
+  qty             Float
+  receivedQty     Float  @default(0)
+  unitPrice       Float  @default(0)
+  discount        Float  @default(0)
+  taxRate         Float  @default(0)
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
-  item            Item          @relation(fields: [itemId], references: [id])
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  item          Item          @relation(fields: [itemId], references: [id])
 
   @@index([purchaseOrderId])
   @@index([itemId])
+  @@map("purchase_order_items")
 }
 
 model Request {
-  id         String   @id @default(cuid())
-  userId     String
-  employee   String
-  department String
-  itemId     String
-  itemName   String
-  qty        Int
-  note       String?  // Optional description from the requester
-  status     String   @default("Pending") // Pending | Approved | Issued | Rejected | Cancelled
-  issuedAt   DateTime?
-  issuedBy   String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String    @id @default(cuid())
+  userId        String
+  requestNumber String?   @unique
+  requestDate   DateTime  @default(now())
+  employee      String
+  department    String
+  concernPerson String?
+  requiredDate  DateTime?
+  machine       String? // machine / cost-center the material is for
+  note          String? // Optional description from the requester
+  status        String    @default("Pending") // DRAFT | Pending | SUBMITTED | UNDER_REVIEW | Approved | ReadyForPickup | PartiallyIssued | Issued | Rejected | Cancelled | CONVERTED_TO_PO  (see src/lib/sr-status.ts)
+  priority      String    @default("MEDIUM")
+  purpose       String?
+  remarks       String?
+  attachments   String?
+  issuedAt      DateTime?
+  issuedBy      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user       User     @relation(fields: [userId], references: [id])
-  item       Item     @relation(fields: [itemId], references: [id])
-  gatePasses GatePass[]
+  user         User            @relation(fields: [userId], references: [id])
+  lines        RequestLine[]
+  gatePasses   GatePass[]
+  linkedPos    PurchaseOrder[]
+  approvalLogs ApprovalLog[]
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
+  @@map("store_requisitions")
+}
+
+model RequestLine {
+  id                   String   @id @default(cuid())
+  requestId            String
+  itemId               String
+  itemName             String
+  requestedQty         Int
+  approvedQty          Int      @default(0)
+  issuedQty            Int      @default(0)
+  availableQtySnapshot Int      @default(0)
+  availableQty         Int      @default(0)
+  pendingPurchaseQty   Int      @default(0)
+  fulfillmentStatus    String   @default("PENDING_CHECK")
+  unit                 String   @default("pcs")
+  status               String   @default("Pending") // Pending | Approved | PartiallyIssued | Issued | Rejected | Cancelled
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  item    Item    @relation(fields: [itemId], references: [id])
+
+  @@index([requestId])
   @@index([itemId])
+  @@map("store_requisition_items")
 }
 
 model Transaction {
-  id        String   @id @default(cuid())
-  type      String   // IN | OUT
-  itemId    String
-  itemName  String
-  qty       Int
-  reference String   @default("")
-  userId    String?
-  date      DateTime @default(now())
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  type          String // IN | OUT
+  subType       String   @default("ADJUST") // OPENING | PURCHASE | TRANSFER_IN | ISSUE | TRANSFER_OUT | RETURN | ADJUST
+  itemId        String
+  itemName      String
+  qty           Float
+  balanceAfter  Float?
+  referenceType String?
+  reference     String   @default("")
+  userId        String?
+  remarks       String?
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
 
-  item      Item     @relation(fields: [itemId], references: [id])
-  user      User?    @relation(fields: [userId], references: [id])
+  status          String? // POSTED | HISTORICAL | etc.
+  importBatchId   String?
+  sourceFileName  String?
+  sourceSheetName String?
+  sourceRowNumber Int?
+  sourceChannel   String  @default("IMPORT")
+  rowHash         String?
+  createdBy       String?
+
+  item Item  @relation(fields: [itemId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 
   @@index([itemId, date])
   @@index([userId, date])
   @@index([type, date])
+  @@index([subType, date])
+  @@map("inventory_transactions")
 }
 
 model FeatureFlag {
-  id    String @id @default(cuid())
-  key   String @unique
+  id    String  @id @default(cuid())
+  key   String  @unique
   value Boolean @default(true)
 }
 
 model SeedFlag {
-  id     String @id @default(cuid())
+  id     String  @id @default(cuid())
   seeded Boolean @default(false)
 }
 
 model AuditLog {
   id         String   @id @default(cuid())
-  action     String   // LOGIN | CREATE_ITEM | UPDATE_ITEM | DELETE_ITEM | APPROVE_REQUEST | REJECT_REQUEST | ISSUE_REQUEST
+  action     String // LOGIN | CREATE_ITEM | UPDATE_ITEM | DELETE_ITEM | APPROVE_REQUEST | REJECT_REQUEST | ISSUE_REQUEST
   userId     String?
   userName   String?
+  targetType String?
   targetId   String?
   targetName String?
-  metadata   String?  // JSON string
+  oldValue   String?
+  newValue   String?
+  metadata   String? // JSON string
   ip         String?
   createdAt  DateTime @default(now())
 
@@ -216,20 +379,67 @@ model AuditLog {
 }
 
 model PurchaseInvoice {
-  id              String   @id @default(cuid())
-  invoiceNumber   String   @unique
-  purchaseOrderId String
-  amount          Float
-  date            DateTime @default(now())
-  status          String   @default("UNPAID") // UNPAID | PAID | CANCELLED
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(cuid())
+  invoiceNumber     String   @unique
+  purchaseOrderId   String
+  vendorId          String?
+  paymentMode       String?
+  amount            Float
+  grossAmount       Float    @default(0)
+  additionalCharges Float    @default(0)
+  netAmount         Float    @default(0)
+  scanUrl           String?
+  date              DateTime @default(now())
+  status            String   @default("UNPAID") // UNPAID | PAID | CANCELLED
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 
   @@index([purchaseOrderId])
   @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceIntake {
+  id                String   @id @default(cuid())
+  sourceName        String?
+  invoiceNumber     String?
+  rawOcrText        String
+  claimedGrandTotal Float
+  purchaseOrderId   String?
+  validationStatus  String // READY_FOR_STOCK | WARNING_RETAINED | REJECTED_MATH_ERROR
+  reviewStatus      String   @default("PENDING") // PENDING | AUTO_POSTED | NEEDS_REVIEW | REJECTED | RESOLVED
+  validationJson    String
+  postedInvoiceId   String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([reviewStatus, createdAt])
+  @@index([validationStatus, createdAt])
+}
+
+model InvoiceBank {
+  id                String    @id @default(cuid())
+  ocrHash           String? // hash of OCR text to dedupe exact repeats
+  sourceName        String? // where the invoice came from (uploader)
+  invoiceNumber     String?
+  invoiceDate       DateTime?
+  vendorName        String?
+  rawOcrText        String
+  claimedGrandTotal Float
+  validationStatus  String // READY_FOR_STOCK | WARNING_RETAINED | REJECTED_MATH_ERROR
+  validationJson    String
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+
+  @@index([ocrHash])
+  @@index([invoiceNumber, invoiceDate])
+  @@index([validationStatus, createdAt])
 }
 
 model DeliveryChallan {
@@ -243,7 +453,7 @@ model DeliveryChallan {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
 
   @@index([purchaseOrderId])
 }
@@ -260,7 +470,7 @@ model GatePass {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  request       Request? @relation(fields: [requestId], references: [id])
+  request Request? @relation(fields: [requestId], references: [id])
 
   @@index([requestId])
   @@index([status])
@@ -297,24 +507,24 @@ model StockTransfer {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  items         StockTransferItem[]
+  items StockTransferItem[]
 
   @@index([status, createdAt])
 }
 
 model StockTransferItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   transferId  String
   itemId      String
   itemName    String
   variantId   String?
   variantName String?
-  qty         Float    @default(0)
-  unit        String   @default("pcs")
+  qty         Float   @default(0)
+  unit        String  @default("pcs")
 
-  transfer    StockTransfer  @relation(fields: [transferId], references: [id])
-  item        Item           @relation(fields: [itemId], references: [id])
-  variant     ItemVariant?   @relation(fields: [variantId], references: [id])
+  transfer StockTransfer @relation(fields: [transferId], references: [id])
+  item     Item          @relation(fields: [itemId], references: [id])
+  variant  ItemVariant?  @relation(fields: [variantId], references: [id])
 
   @@index([transferId])
   @@index([itemId])
@@ -333,6 +543,7 @@ model ItemTag {
   tagId  String
   item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
   tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
   @@id([itemId, tagId])
 }
 
@@ -384,7 +595,7 @@ model MaintenanceSchedule {
   lastCompleted DateTime?
   status        String    @default("PENDING")
   notes         String?
-  assetId       String?                           // optional link to an Asset (reuse maintenance for assets)
+  assetId       String? // optional link to an Asset (reuse maintenance for assets)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   item          Item      @relation(fields: [itemId], references: [id])
@@ -405,9 +616,9 @@ model Asset {
   id               String    @id @default(cuid())
   name             String
   serialNumber     String    @unique
-  itemId           String?                       // optional link to catalog Item
+  itemId           String? // optional link to catalog Item
   status           String    @default("IN_STOCK") // IN_STOCK | ASSIGNED | MAINTENANCE | RETIRED
-  assignedToUserId String?                       // employee the unit is assigned to
+  assignedToUserId String? // employee the unit is assigned to
   assignedAt       DateTime?
   warrantyExpiry   DateTime?
   licenseExpiry    DateTime?
@@ -418,3 +629,634 @@ model Asset {
   @@index([status])
   @@index([assignedToUserId])
 }
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  importBatchId   String?
+  sourceFileName  String?
+  sourceSheetName String?
+  sourceRowNumber Int?
+  sourceChannel   String  @default("IMPORT")
+  rowHash         String?
+  createdBy       String?
+
+  dailyProcurementBatches DailyProcurementBatch[]
+}
+
+model ImportBatch {
+  id          String    @id @default(cuid())
+  fileName    String
+  status      String // UPLOADED | VALIDATED | IMPORTING | COMPLETED | FAILED | ROLLED_BACK
+  totalRows   Int       @default(0)
+  validRows   Int       @default(0)
+  errorRows   Int       @default(0)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdBy   String?
+}
+
+model WhatsAppMessage {
+  id                  String    @id @default(cuid())
+  phone               String // Recipient or Sender number (e.g. 919876543210)
+  message             String // Human-readable content; never overwritten after inbound capture
+  direction           String // INBOUND | OUTBOUND | SYSTEM | NOTE
+  status              String    @default("PENDING") // DRAFT | PENDING | PROCESSING | SENT | DELIVERED | READ | FAILED | PROCESSED
+  messageType         String    @default("GENERAL") // REQUIREMENT_SENT | VENDOR_REPLY | USER_REPLY | SUPPLY_CONFIRMATION | SHORTAGE_MESSAGE | ALTERNATE_VENDOR_REQUEST | DELIVERY_UPDATE | SYSTEM_EVENT | MANUAL_NOTE | GENERAL
+  error               String?
+  senderName          String? // Resolved name or WhatsApp pushName
+  providerMessageId   String?   @unique
+  providerTimestamp   DateTime?
+  rawMessage          String?
+  rawPayload          Json?
+  attachmentMetadata  Json?
+  supplierId          String?
+  dailyBatchId        String?
+  dailyConversationId String?
+  parsedSuggestion    Json?
+  parsingConfidence   Float?
+  verificationStatus  String    @default("UNPARSED") // UNPARSED | PARSED | NEEDS_REVIEW | VERIFIED | IGNORED
+  linkedBy            String?
+  linkedAt            DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  supplier          Supplier?                     @relation(fields: [supplierId], references: [id])
+  dailyBatch        DailyProcurementBatch?        @relation(fields: [dailyBatchId], references: [id], onDelete: SetNull)
+  dailyConversation DailyProcurementConversation? @relation(fields: [dailyConversationId], references: [id], onDelete: SetNull)
+
+  @@index([status, direction])
+  @@index([phone])
+  @@index([dailyBatchId, createdAt])
+  @@index([dailyConversationId, createdAt])
+  @@index([supplierId, createdAt])
+}
+
+model WhatsAppSession {
+  id         String   @id @default(cuid())
+  status     String   @default("DISCONNECTED") // DISCONNECTED | CONNECTING | CONNECTED
+  qrCode     String? // base64 or raw string
+  reconnects Int      @default(0)
+  command    String? // RELINK | null
+  updatedAt  DateTime @updatedAt
+}
+
+model GoodsReceipt {
+  id                 String    @id @default(cuid())
+  grnNumber          String    @unique
+  purchaseOrderId    String
+  receivedDate       DateTime  @default(now())
+  supplierId         String
+  receivedBy         String
+  remarks            String?
+  deliveryTime       DateTime?
+  challanNumber      String?
+  invoiceNumber      String?
+  attachmentMetadata Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  purchaseOrder PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id])
+  items         GoodsReceiptItem[]
+
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id              String   @id @default(cuid())
+  goodsReceiptId  String
+  itemId          String
+  orderedQty      Float
+  receivedQty     Float
+  grossWeight     Float?
+  containerWeight Float?
+  netReceivedQty  Float?
+  rejectedQty     Float    @default(0)
+  acceptedQty     Float
+  shortQty        Float    @default(0)
+  excessQty       Float    @default(0)
+  qualityResult   String?
+  rejectionReason String?
+  remarks         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  goodsReceipt GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  item         Item         @relation(fields: [itemId], references: [id])
+
+  @@map("goods_receipt_items")
+}
+
+model ApprovalLog {
+  id        String   @id @default(cuid())
+  poId      String?
+  reqId     String?
+  userId    String
+  userName  String
+  role      String
+  action    String // SUBMIT | APPROVE | REJECT
+  remarks   String?
+  amount    Float
+  createdAt DateTime @default(now())
+
+  purchaseOrder PurchaseOrder? @relation(fields: [poId], references: [id])
+  request       Request?       @relation(fields: [reqId], references: [id])
+
+  @@map("approval_logs")
+}
+
+// --- Configurable approval engine (spec: 2026-06-23-approval-engine-design.md §2) ---
+
+// Rule rows. Multiple rows per module define the chain; conditions select which apply.
+model ApprovalWorkflow {
+  id             String   @id @default(cuid())
+  moduleName     String // STORE_REQUISITION | PURCHASE_REQUIREMENT | PURCHASE_ORDER | INVOICE | TRANSFER | STOCK_ADJUSTMENT | ASSET_REQUEST
+  conditionType  String // ALWAYS | AMOUNT_LT | AMOUNT_GTE | FLAG_TRUE
+  conditionValue String? // numeric threshold (as string) for AMOUNT_*, or a flag name for FLAG_TRUE
+  approverRole   String // a User.role value
+  sequence       Int // step order within the chain (1, 2, ...)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([moduleName, active])
+  @@map("approval_workflows")
+}
+
+// One per document under approval.
+model ApprovalInstance {
+  id           String   @id @default(cuid())
+  moduleName   String
+  documentType String // same as moduleName today; kept distinct for future sub-types
+  documentId   String // the SR / PO / etc. id
+  status       String   @default("PENDING_APPROVAL") // DRAFT | PENDING_APPROVAL | APPROVED | REJECTED | CANCELLED
+  currentStep  Int      @default(1)
+  createdById  String // requester — used to block self-approval
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  steps ApprovalStep[]
+
+  @@index([moduleName, documentId])
+  @@map("approval_instances")
+}
+
+// One per approver in the chain — drives the timeline + records who/when/comment.
+model ApprovalStep {
+  id           String    @id @default(cuid())
+  instanceId   String
+  sequence     Int
+  approverRole String
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED | SKIPPED
+  approvedById String?
+  approvedAt   DateTime?
+  remarks      String?
+
+  instance ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+  @@map("approval_instance_steps")
+}
+
+model ItemAlias {
+  id              String   @id @default(cuid())
+  aliasText       String
+  itemId          String
+  sourceType      String?
+  vendorId        String?
+  confidenceScore Float    @default(0)
+  timesMatched    Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  item Item @relation(fields: [itemId], references: [id])
+
+  @@index([aliasText])
+  @@index([itemId])
+  @@map("item_aliases")
+}
+
+model DailyProcurementBatch {
+  id                    String    @id @default(cuid())
+  batchNumber           String    @unique
+  requirementDate       DateTime  @default(now())
+  deliveryDate          DateTime
+  deliveryTimeSlot      String?
+  requirementCutoffTime DateTime?
+  locationId            String?
+  deliveryLocation      String?
+  departmentId          String?
+  departmentName        String?
+  status                String    @default("DRAFT") // DRAFT | REQUIREMENTS_READY | ENQUIRY_SENT | QUOTES_RECEIVED | ALLOCATION_READY | PENDING_APPROVAL | APPROVED | SUPPLY_ORDERED | RECEIVING | GRN_POSTED | INVOICE_RECONCILED | CLOSED | CANCELLED
+  createdBy             String
+  createdById           String?
+  approvedBy            String?
+  approvedAt            DateTime?
+  notes                 String?
+  version               Int       @default(1)
+  cancellationReason    String?
+  completedAt           DateTime?
+  closedBy              String?
+  reopenedAt            DateTime?
+  reopenedBy            String?
+  reopenReason          String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  lines            DailyProcurementLine[]
+  enquiries        DailyRateEnquiry[]
+  allocations      DailyVendorAllocation[]
+  supplyOrders     DailySupplyOrder[]
+  conversations    DailyProcurementConversation[]
+  whatsappMessages WhatsAppMessage[]
+  department       Department?                    @relation(fields: [departmentId], references: [id])
+
+  @@index([status, deliveryDate])
+  @@index([departmentId, deliveryDate])
+  @@index([createdAt])
+  @@map("daily_procurement_batches")
+}
+
+model DailyProcurementLine {
+  id                     String    @id @default(cuid())
+  batchId                String
+  sourceType             String    @default("MANUAL") // MANUAL | STORE_REQUISITION | LOW_STOCK | PRODUCTION_PLAN | WHATSAPP
+  sourceRequestId        String?
+  sourceRequestLineId    String?
+  itemId                 String
+  itemName               String
+  unit                   String
+  operationalRequirement Float
+  requiredClosingStock   Float     @default(0)
+  usableStock            Float     @default(0)
+  confirmedPendingSupply Float     @default(0)
+  calculatedNetQty       Float
+  finalPurchaseQty       Float
+  overrideReason         String?
+  overriddenBy           String?
+  overriddenAt           DateTime?
+  qualityGrade           String?
+  itemSpec               String?
+  storageCondition       String?
+  deliveryLocation       String?
+  deliveryTimeSlot       String?
+  notes                  String?
+  status                 String    @default("OPEN") // OPEN | ENQUIRY_SENT | QUOTED | ALLOCATED | ORDERED | RECEIVED | CANCELLED
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  batch             DailyProcurementBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  item              Item                    @relation(fields: [itemId], references: [id])
+  enquiryLines      DailyRateEnquiryLine[]
+  allocations       DailyVendorAllocation[]
+  conversationLines DailyConversationLine[]
+
+  @@index([batchId])
+  @@index([itemId])
+  @@index([sourceRequestLineId])
+  @@map("daily_procurement_lines")
+}
+
+model DailyRateEnquiry {
+  id                String    @id @default(cuid())
+  enquiryNumber     String    @unique
+  batchId           String
+  supplierId        String
+  status            String    @default("DRAFT") // DRAFT | QUEUED | SENT | FAILED | EXPIRED
+  businessStatus    String    @default("AWAITING_RESPONSE") // AWAITING_RESPONSE | QUOTATION_RECEIVED | PARTIALLY_QUOTED | UNAVAILABLE | VENDOR_DECLINED | NEEDS_REVIEW | VERIFIED | EXPIRED
+  messageStatus     String    @default("DRAFT") // DRAFT | QUEUED | SENT | DELIVERED | READ | FAILED
+  whatsappMessageId String?
+  whatsappReference String    @unique
+  language          String    @default("en")
+  sentAt            DateTime?
+  createdBy         String
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  batch    DailyProcurementBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  supplier Supplier               @relation(fields: [supplierId], references: [id])
+  lines    DailyRateEnquiryLine[]
+
+  @@index([batchId])
+  @@index([supplierId])
+  @@index([status, createdAt])
+  @@map("daily_rate_enquiries")
+}
+
+model DailyRateEnquiryLine {
+  id           String   @id @default(cuid())
+  enquiryId    String
+  batchLineId  String
+  itemId       String
+  requestedQty Float
+  unit         String
+  qualityGrade String?
+  itemSpec     String?
+  status       String   @default("AWAITING_RESPONSE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enquiry   DailyRateEnquiry     @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  batchLine DailyProcurementLine @relation(fields: [batchLineId], references: [id])
+  item      Item                 @relation(fields: [itemId], references: [id])
+  quotes    DailyVendorQuote[]
+
+  @@index([enquiryId])
+  @@index([batchLineId])
+  @@index([itemId])
+  @@map("daily_rate_enquiry_lines")
+}
+
+model DailyVendorQuote {
+  id                    String    @id @default(cuid())
+  enquiryLineId         String
+  supplierId            String
+  originalMessageId     String?
+  originalMessageText   String?
+  quotedItemText        String?
+  matchedItemId         String?
+  requestedQuantity     Float
+  availableQuantity     Float
+  quotedRate            Float
+  quotedUnit            String
+  conversionFactor      Float?
+  conversionApproximate Boolean   @default(false)
+  normalizedRate        Float?
+  qualityGrade          String?
+  transportCharge       Float     @default(0)
+  taxRate               Float     @default(0)
+  deliveryTime          DateTime?
+  validityDateTime      DateTime?
+  substituteItem        String?
+  vendorRemarks         String?
+  parsingConfidence     Float?
+  verificationStatus    String    @default("NEEDS_REVIEW") // UNPARSED | PARSED | NEEDS_REVIEW | VERIFIED | REJECTED | EXPIRED
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  enquiryLine DailyRateEnquiryLine    @relation(fields: [enquiryLineId], references: [id], onDelete: Cascade)
+  supplier    Supplier                @relation(fields: [supplierId], references: [id])
+  matchedItem Item?                   @relation("DailyVendorQuoteMatchedItem", fields: [matchedItemId], references: [id])
+  allocations DailyVendorAllocation[]
+
+  @@index([enquiryLineId])
+  @@index([supplierId])
+  @@index([verificationStatus])
+  @@map("daily_vendor_quotes")
+}
+
+model DailyVendorAllocation {
+  id                   String    @id @default(cuid())
+  batchId              String
+  batchLineId          String
+  quoteId              String?
+  supplierId           String
+  itemId               String
+  allocatedQty         Float
+  unit                 String
+  normalizedRate       Float
+  transportCharge      Float     @default(0)
+  taxRate              Float     @default(0)
+  landedRate           Float
+  recommendationReason String?
+  status               String    @default("PROPOSED") // PROPOSED | APPROVED | ORDERED | CANCELLED
+  createdBy            String
+  approvedBy           String?
+  approvedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  batch      DailyProcurementBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchLine  DailyProcurementLine   @relation(fields: [batchLineId], references: [id])
+  quote      DailyVendorQuote?      @relation(fields: [quoteId], references: [id])
+  supplier   Supplier               @relation(fields: [supplierId], references: [id])
+  item       Item                   @relation(fields: [itemId], references: [id])
+  orderLines DailySupplyOrderLine[]
+
+  @@index([batchId])
+  @@index([batchLineId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("daily_vendor_allocations")
+}
+
+model DailySupplyOrder {
+  id                         String    @id @default(cuid())
+  orderNumber                String    @unique
+  batchId                    String
+  supplierId                 String
+  status                     String    @default("DRAFT") // DRAFT | PENDING_APPROVAL | APPROVED | QUEUED | SENT | CONFIRMED | PARTIALLY_RECEIVED | RECEIVED | CANCELLED
+  whatsappMessageId          String?
+  whatsappReference          String    @unique
+  messageStatus              String    @default("DRAFT")
+  businessConfirmationStatus String    @default("AWAITING_CONFIRMATION")
+  deliveryLocation           String?
+  deliveryDate               DateTime?
+  deliveryTimeSlot           String?
+  createdBy                  String
+  approvedBy                 String?
+  approvedAt                 DateTime?
+  sentAt                     DateTime?
+  purchaseOrderId            String?   @unique
+  conversationId             String?
+  confirmationMessageId      String?
+  confirmationSource         String? // WHATSAPP | PHONE | MANUAL | SYSTEM
+  confirmedById              String?
+  confirmedAt                DateTime?
+  revision                   Int       @default(1)
+  notes                      String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  batch         DailyProcurementBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  supplier      Supplier                      @relation(fields: [supplierId], references: [id])
+  lines         DailySupplyOrderLine[]
+  conversation  DailyProcurementConversation? @relation(fields: [conversationId], references: [id])
+  purchaseOrder PurchaseOrder?                @relation(fields: [purchaseOrderId], references: [id])
+
+  @@index([batchId])
+  @@index([supplierId])
+  @@index([conversationId])
+  @@index([status, createdAt])
+  @@map("daily_supply_orders")
+}
+
+model DailySupplyOrderLine {
+  id              String   @id @default(cuid())
+  supplyOrderId   String
+  allocationId    String?
+  itemId          String
+  itemName        String
+  orderedQty      Float
+  acceptedQty     Float    @default(0)
+  rejectedQty     Float    @default(0)
+  unit            String
+  rate            Float?
+  taxRate         Float    @default(0)
+  transportCharge Float    @default(0)
+  status          String   @default("ORDERED")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  supplyOrder DailySupplyOrder       @relation(fields: [supplyOrderId], references: [id], onDelete: Cascade)
+  allocation  DailyVendorAllocation? @relation(fields: [allocationId], references: [id])
+  item        Item                   @relation(fields: [itemId], references: [id])
+
+  @@index([supplyOrderId])
+  @@index([allocationId])
+  @@index([itemId])
+  @@map("daily_supply_order_lines")
+}
+
+model DailyProcurementConversation {
+  id              String    @id @default(cuid())
+  batchId         String
+  supplierId      String
+  normalizedPhone String
+  status          String    @default("DRAFT") // DRAFT | SENT_TO_VENDOR | AWAITING_VENDOR_REPLY | REPLY_RECEIVED | NEEDS_REVIEW | PARTIALLY_CONFIRMED | CONFIRMED | SHORTAGE | ALTERNATE_VENDOR_REQUIRED | READY_FOR_RECEIVING | RECEIVED | CLOSED | CANCELLED
+  unreadCount     Int       @default(0)
+  lastMessageAt   DateTime?
+  sentAt          DateTime?
+  closedAt        DateTime?
+  createdById     String?
+  createdBy       String
+  notes           String?
+  revision        Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  batch        DailyProcurementBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  supplier     Supplier                @relation(fields: [supplierId], references: [id])
+  lines        DailyConversationLine[]
+  messages     WhatsAppMessage[]
+  supplyOrders DailySupplyOrder[]
+
+  @@unique([batchId, supplierId])
+  @@index([supplierId, status, updatedAt])
+  @@index([normalizedPhone, status])
+  @@map("daily_procurement_conversations")
+}
+
+model DailyConversationLine {
+  id                        String    @id @default(cuid())
+  conversationId            String
+  batchLineId               String
+  itemId                    String
+  requestedQty              Float
+  confirmedQty              Float     @default(0)
+  shortQty                  Float     @default(0)
+  cancelledQty              Float     @default(0)
+  status                    String    @default("REQUESTED") // REQUESTED | CONFIRMED | PARTIAL | UNAVAILABLE | CANCELLED | READY_FOR_RECEIVING | RECEIVED
+  confirmedDeliveryTime     DateTime?
+  vendorNote                String?
+  vendorRate                Float?
+  rateVerified              Boolean   @default(false)
+  lastConfirmationMessageId String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  conversation DailyProcurementConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  batchLine    DailyProcurementLine         @relation(fields: [batchLineId], references: [id])
+  item         Item                         @relation(fields: [itemId], references: [id])
+
+  @@unique([conversationId, batchLineId])
+  @@index([batchLineId])
+  @@index([itemId])
+  @@map("daily_conversation_lines")
+}
+
+model SupplierItemMapping {
+  id                 String   @id @default(cuid())
+  supplierId         String
+  itemId             String
+  active             Boolean  @default(true)
+  priority           Int      @default(100)
+  preferred          Boolean  @default(false)
+  vendorItemName     String?
+  vendorUnit         String?
+  minimumOrderQty    Float?
+  leadTimeHours      Float?
+  availabilityStatus String   @default("AVAILABLE") // AVAILABLE | LIMITED | UNAVAILABLE
+  deliveryLocations  Json?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  item     Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, itemId])
+  @@index([itemId, active, priority])
+  @@map("supplier_item_mappings")
+}
+
+model PriceTransaction {
+  id                   String   @id @default(cuid())
+  itemId               String
+  categoryId           String?
+  unitId               String?
+  supplierId           String?
+  transactionDate      DateTime
+  rate                 Float
+  quantity             Float
+  lineAmount           Float
+  gstRate              Float    @default(0)
+  taxAmount            Float    @default(0)
+  grossAmount          Float
+  grossRate            Float
+  invoiceNumber        String?
+  notes                String?
+  sourceType           String   @default("MANUAL_ENTRY") // MANUAL_ENTRY | EXCEL_IMPORT | PURCHASE_INVOICE | GRN | DAILY_PROCUREMENT
+  sourceReference      String?
+  originalItemText     String?
+  originalSupplierText String?
+  importBatchId        String?
+  companyId            String?  @default("default")
+  locationId           String?  @default("Main Store")
+  createdById          String?
+  createdBy            String   @default("System")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  item        Item              @relation(fields: [itemId], references: [id])
+  supplier    Supplier?         @relation(fields: [supplierId], references: [id])
+  importBatch PriceImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+
+  @@index([itemId, transactionDate])
+  @@index([supplierId, transactionDate])
+  @@index([transactionDate])
+  @@map("price_transactions")
+}
+
+model PriceImportBatch {
+  id           String             @id @default(cuid())
+  fileName     String
+  totalRows    Int
+  importedRows Int
+  unmappedRows Int                @default(0)
+  status       String             @default("COMPLETED")
+  uploadedBy   String
+  createdAt    DateTime           @default(now())
+  transactions PriceTransaction[]
+
+  @@map("price_import_batches")
+}
+
+model PriceMapping {
+  id           String   @id @default(cuid())
+  sourceText   String   @unique
+  mappedItemId String
+  mappedBy     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("price_mappings")
+}
+

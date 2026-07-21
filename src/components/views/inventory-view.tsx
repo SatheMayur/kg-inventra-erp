@@ -10,6 +10,8 @@ import {
   ChevronRight, 
   FileUp,
   Download,
+  LayoutGrid,
+  List,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,7 +26,7 @@ import { InventoryTable } from '@/components/inventory/InventoryTable'
 import { BulkImportDialog } from '@/components/inventory/BulkImportDialog'
 import { AddItemDialog } from '@/components/inventory/AddItemDialog'
 
-export default function InventoryView() {
+export default function InventoryView({ title = 'Inventory' }: { title?: string }) {
   const { user, flags } = useAppStore()
   const isAdmin = user?.role === 'admin'
 
@@ -34,6 +36,18 @@ export default function InventoryView() {
   const [categories, setCategories] = useState<string[]>([])
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+
+  // Layout state
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fg_items_view_mode') as 'list' | 'grid'
+      if (saved === 'list' || saved === 'grid') {
+        setViewMode(saved)
+      }
+    }
+  }, [])
 
   // Filter state
   const [search, setSearch] = useState('')
@@ -105,7 +119,7 @@ export default function InventoryView() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-base font-semibold tracking-tight text-foreground">Inventory</h3>
+          <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
           <div className="mt-1.5 flex items-center gap-4">
             <span className="text-sm text-muted-foreground tabular-nums font-medium">{totalItems} items</span>
             <span className="w-px h-3 bg-border" />
@@ -204,11 +218,33 @@ export default function InventoryView() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* View Mode Toggle */}
+        <div className="flex border border-border rounded-md overflow-hidden shrink-0">
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 rounded-none border-0 px-2.5 text-muted-foreground"
+            onClick={() => { setViewMode('list'); localStorage.setItem('fg_items_view_mode', 'list'); }}
+            title="List view"
+          >
+            <List className="size-4" />
+          </Button>
+          <Button
+            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 rounded-none border-0 px-2.5 text-muted-foreground"
+            onClick={() => { setViewMode('grid'); localStorage.setItem('fg_items_view_mode', 'grid'); }}
+            title="Grid view"
+          >
+            <LayoutGrid className="size-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
       <Card className="border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.04)] overflow-hidden">
-        <InventoryTable items={items} loading={loading} onRefresh={onImportSuccess} />
+        <InventoryTable items={items} loading={loading} onRefresh={onImportSuccess} viewMode={viewMode} />
 
         {/* Pagination */}
         <div className="border-t border-border/40 bg-muted/10 px-4 py-2.5 flex items-center justify-between">

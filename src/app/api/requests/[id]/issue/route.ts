@@ -14,6 +14,8 @@ import {
   rollupRequestStatus,
   flattenRequest,
 } from '@/lib/request-fulfillment';
+import { SR_STATUS, ISSUABLE_STATUSES, LINE_STATUS } from '@/lib/sr-status';
+import { isApproved } from '@/lib/approvals/engine';
 
 export async function PATCH(
   request: NextRequest,
@@ -40,19 +42,31 @@ export async function PATCH(
       const req = await tx.request.findUnique({ where: { id }, include: { lines: true } });
       if (!req) throw new ApiError(404, 'Request not found', 'NOT_FOUND');
 
-      if (!['Approved', 'ReadyForPickup', 'PartiallyIssued'].includes(req.status)) {
+      if (!ISSUABLE_STATUSES.includes(req.status)) {
         throw new ApiError(
           400,
-          'Only approved, ready-for-pickup or partially-issued requests can be issued',
+          'Only approved, converted-to-PO, ready-for-pickup or partially-issued requests can be issued',
           'BAD_REQUEST'
         );
+      }
+
+      const approved = (
+        req.status === SR_STATUS.APPROVED ||
+        req.status === SR_STATUS.CONVERTED_TO_PO ||
+        req.status === SR_STATUS.READY_FOR_PICKUP ||
+        req.status === SR_STATUS.PARTIALLY_ISSUED ||
+        req.status === SR_STATUS.STOCK_AVAILABLE ||
+        req.status === SR_STATUS.ISSUE_PENDING
+      ) || (await isApproved('STORE_REQUISITION', id));
+      if (!approved) {
+        throw new ApiError(400, 'Requisition is not approved', 'BAD_REQUEST');
       }
 
       const plan =
         requestedLines && requestedLines.length > 0
           ? requestedLines
           : req.lines
-              .filter((l) => l.status !== 'Rejected' && l.status !== 'Cancelled' && l.approvedQty - l.issuedQty > 0)
+              .filter((l) => l.status !== LINE_STATUS.REJECTED && l.status !== LINE_STATUS.CANCELLED && l.approvedQty - l.issuedQty > 0)
               .map((l) => ({ lineId: l.id, qty: l.approvedQty - l.issuedQty }));
 
       if (plan.length === 0) throw new ApiError(400, 'Nothing to issue', 'BAD_REQUEST');
@@ -119,8 +133,8 @@ export async function PATCH(
         where: { id },
         data: {
           status: headerStatus,
-          issuedAt: headerStatus === 'Issued' ? new Date() : req.issuedAt,
-          issuedBy: headerStatus === 'Issued' ? issuedBy : req.issuedBy,
+          issuedAt: headerStatus === SR_STATUS.ISSUED ? new Date() : req.issuedAt,
+          issuedBy: headerStatus === SR_STATUS.ISSUED ? issuedBy : req.issuedBy,
         },
         include: { lines: true },
       });
@@ -140,8 +154,8 @@ export async function PATCH(
 
     await createNotification({
       userId: result.request.userId,
-      title: result.request.status === 'Issued' ? 'Items Issued' : 'Items Partially Issued',
-      message: `Your request "${flat.itemName}" has been ${result.request.status === 'Issued' ? 'fully' : 'partially'} issued.`,
+      title: result.request.status === SR_STATUS.ISSUED ? 'Items Issued' : 'Items Partially Issued',
+      message: `Your request "${flat.itemName}" has been ${result.request.status === SR_STATUS.ISSUED ? 'fully' : 'partially'} issued.`,
       type: 'info',
       link: 'requests',
     });

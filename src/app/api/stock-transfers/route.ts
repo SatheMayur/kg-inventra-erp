@@ -4,6 +4,7 @@ import { authorize } from '@/lib/auth';
 import { handleApiError, ApiError } from '@/lib/api-utils';
 import { z } from 'zod';
 import { createAuditLog } from '@/lib/audit';
+import { getKolkataDateString } from '@/lib/date-utils';
 
 const transferItemSchema = z.object({
   itemId: z.string().min(1),
@@ -25,7 +26,9 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(auth.user!.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -55,19 +58,29 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await authorize(request);
     if (auth.error) return NextResponse.json({ error: auth.error }, { status: auth.status });
-    if (auth.user?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!['admin', 'STORE_ADMIN', 'STORE_OPERATOR'].includes(auth.user!.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const body = await request.json();
     const validated = createTransferSchema.parse(body);
 
-    // Verify all items exist
+    // Cannot transfer to same location
+    if (validated.fromLocation.trim().toLowerCase() === validated.toLocation.trim().toLowerCase()) {
+      throw new ApiError(400, 'From and To locations must be different', 'BAD_REQUEST');
+    }
+
+    // Verify all items exist and have sufficient stock for the transfer
     for (const ti of validated.items) {
       const item = await db.item.findUnique({ where: { id: ti.itemId, deletedAt: null } });
       if (!item) throw new ApiError(404, `Item "${ti.itemName}" not found`, 'NOT_FOUND');
+      if (item.stock < ti.qty) {
+        throw new ApiError(400, `Insufficient stock for "${item.name}": available ${item.stock}, requested ${ti.qty}`, 'BAD_REQUEST');
+      }
     }
 
     // Generate memo number TM-YYYYMMDD-NNN
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const date = getKolkataDateString().replace(/-/g, '');
     const count = await db.stockTransfer.count({
       where: { memoNumber: { startsWith: `TM-${date}` } },
     });

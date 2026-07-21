@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { randomBytes } from 'crypto'
+import { getKolkataDateString } from './date-utils'
+import { OPEN_PO_STATUSES } from './po-status'
 
 export interface ReorderItem {
   stock: number
@@ -31,10 +33,10 @@ type Tx = Prisma.TransactionClient
  */
 export async function checkReorder(tx: Tx, itemId: string): Promise<void> {
   const item = await tx.item.findUnique({ where: { id: itemId } })
-  if (!item || item.deletedAt) return
+  if (!item || item.deletedAt || !item.active) return
 
   const openPo = await tx.pOItem.findFirst({
-    where: { itemId, purchaseOrder: { status: { in: ['DRAFT', 'PENDING_APPROVAL', 'SENT'] } } },
+    where: { itemId, purchaseOrder: { status: { in: [...OPEN_PO_STATUSES] } } },
   })
 
   if (
@@ -52,7 +54,7 @@ export async function checkReorder(tx: Tx, itemId: string): Promise<void> {
     return
   }
 
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const date = getKolkataDateString().replace(/-/g, '')
   // Random suffix (not a row count): checkReorder runs inside the stock-out
   // transaction, so a duplicate poNumber would throw P2002 and roll back the
   // entire issue/checkout/transfer — failing a legitimate operation under any

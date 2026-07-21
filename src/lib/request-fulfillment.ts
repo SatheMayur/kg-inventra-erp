@@ -4,21 +4,23 @@
  * be issued in instalments (partial fulfillment). These helpers derive line and
  * header status from those quantities so routes never hand-roll the rollup.
  */
+import { SR_STATUS, LINE_STATUS } from './sr-status';
 
 export type LineLike = {
   requestedQty: number
   approvedQty: number
   issuedQty: number
   status: string
+  pendingPurchaseQty?: number
 }
 
 export type LineStatus = 'Approved' | 'PartiallyIssued' | 'Issued'
 
 /** Status of a single approved line after an issue, from its issued vs approved qty. */
 export function lineStatusAfterIssue(approvedQty: number, issuedQty: number): LineStatus {
-  if (issuedQty <= 0) return 'Approved'
-  if (issuedQty >= approvedQty) return 'Issued'
-  return 'PartiallyIssued'
+  if (issuedQty <= 0) return LINE_STATUS.APPROVED as LineStatus
+  if (issuedQty >= approvedQty) return LINE_STATUS.ISSUED as LineStatus
+  return LINE_STATUS.PARTIALLY_ISSUED as LineStatus
 }
 
 /**
@@ -27,20 +29,21 @@ export function lineStatusAfterIssue(approvedQty: number, issuedQty: number): Li
  * follows suit (Cancelled wins if any line was cancelled).
  */
 export function rollupRequestStatus(lines: LineLike[]): string {
-  if (lines.length === 0) return 'Pending'
+  if (lines.length === 0) return SR_STATUS.PENDING
 
-  const active = lines.filter((l) => l.status !== 'Rejected' && l.status !== 'Cancelled')
+  const active = lines.filter((l) => l.status !== LINE_STATUS.REJECTED && l.status !== LINE_STATUS.CANCELLED)
   if (active.length === 0) {
-    return lines.some((l) => l.status === 'Cancelled') ? 'Cancelled' : 'Rejected'
+    return lines.some((l) => l.status === LINE_STATUS.CANCELLED) ? SR_STATUS.CANCELLED : SR_STATUS.REJECTED
   }
 
   const totalApproved = active.reduce((s, l) => s + l.approvedQty, 0)
   const totalIssued = active.reduce((s, l) => s + l.issuedQty, 0)
+  const hasPendingPurchase = active.some((l) => (l.pendingPurchaseQty ?? 0) > 0)
 
-  if (totalApproved <= 0) return 'Pending'
-  if (totalIssued <= 0) return 'Approved'
-  if (totalIssued >= totalApproved) return 'Issued'
-  return 'PartiallyIssued'
+  if (totalApproved <= 0) return SR_STATUS.PENDING
+  if (totalIssued <= 0) return hasPendingPurchase ? SR_STATUS.CONVERTED_TO_PO : SR_STATUS.APPROVED
+  if (totalIssued >= totalApproved) return SR_STATUS.ISSUED
+  return SR_STATUS.PARTIALLY_ISSUED
 }
 
 /**
@@ -94,6 +97,124 @@ export const FULFILLMENT_STATUS = {
   CANCELLED: 'CANCELLED',
 } as const
 
+export type NextActionTone = 'default' | 'warning' | 'success' | 'muted'
+export type RequestNextAction = {
+  label: string
+  owner: string
+  detail: string
+  tone: NextActionTone
+}
+
+export type NextActionLine = {
+  requestedQty: number
+  approvedQty?: number
+  issuedQty?: number
+  availableQty?: number
+  pendingPurchaseQty?: number
+  status?: string
+}
+
+export type NextActionRequest = {
+  status: string
+  department?: string | null
+  lines?: NextActionLine[]
+}
+
+function normalizeWorkflowStatus(status: string) {
+  return status.toUpperCase().replace(/[\s_]+/g, '')
+}
+
+function reservedReadyQty(line: NextActionLine) {
+  return Math.max(0, (line.availableQty ?? 0) - (line.issuedQty ?? 0))
+}
+
+export function getRequestNextAction(request: NextActionRequest): RequestNextAction {
+  const status = normalizeWorkflowStatus(request.status)
+  const lines = request.lines ?? []
+  const readyQty = lines.reduce((sum, line) => sum + reservedReadyQty(line), 0)
+  const pendingPurchaseQty = lines.reduce((sum, line) => sum + Math.max(0, line.pendingPurchaseQty ?? 0), 0)
+  const approvedQty = lines.reduce((sum, line) => sum + Math.max(0, line.approvedQty ?? 0), 0)
+  const issuedQty = lines.reduce((sum, line) => sum + Math.max(0, line.issuedQty ?? 0), 0)
+
+  if (['REJECTED', 'CANCELLED'].includes(status)) {
+    return {
+      label: status === 'REJECTED' ? 'No Action - Rejected' : 'No Action - Cancelled',
+      owner: 'Closed',
+      detail: 'This request is no longer active.',
+      tone: 'muted',
+    }
+  }
+
+  if (['ISSUED', 'CLOSED'].includes(status) || (approvedQty > 0 && issuedQty >= approvedQty && pendingPurchaseQty <= 0)) {
+    return {
+      label: 'Completed',
+      owner: 'Closed',
+      detail: 'All approved material has been issued.',
+      tone: 'success',
+    }
+  }
+
+  if (['PENDING', 'SUBMITTED', 'PENDINGDEPTAPPROVAL', 'PENDINGDEPARTMENTAPPROVAL', 'UNDERREVIEW'].includes(status)) {
+    return {
+      label: 'Approve Request',
+      owner: request.department ? `Dept. Head (${request.department})` : 'Department Head',
+      detail: 'Request is waiting for approval before store or purchase action.',
+      tone: 'warning',
+    }
+  }
+
+  if (pendingPurchaseQty > 0 && readyQty > 0) {
+    return {
+      label: 'Issue Ready Qty / Track PO Balance',
+      owner: 'Store Admin / Operator',
+      detail: `${readyQty} item(s) are reserved now; ${pendingPurchaseQty} item(s) are still pending purchase.`,
+      tone: 'warning',
+    }
+  }
+
+  if (pendingPurchaseQty > 0) {
+    if (status === 'CONVERTEDTOPO') {
+      return {
+        label: 'Receive PO Stock',
+        owner: 'Store / Purchase',
+        detail: `${pendingPurchaseQty} item(s) are waiting for purchase receipt.`,
+        tone: 'warning',
+      }
+    }
+    return {
+      label: 'Create PO',
+      owner: 'Purchase Department',
+      detail: `${pendingPurchaseQty} item(s) need purchasing before issue.`,
+      tone: 'warning',
+    }
+  }
+
+  if (readyQty > 0) {
+    return {
+      label: 'Proceed to Issue',
+      owner: 'Store Admin / Operator',
+      detail: `${readyQty} item(s) are reserved and ready to issue.`,
+      tone: 'success',
+    }
+  }
+
+  if (['APPROVED', 'PARTIALLYISSUED', 'READYFORPICKUP', 'STOCKAVAILABLE', 'ISSUEPENDING'].includes(status)) {
+    return {
+      label: 'Verify Reserved Stock',
+      owner: 'Store Admin / Operator',
+      detail: 'Request is approved, but no reserved quantity is currently ready.',
+      tone: 'default',
+    }
+  }
+
+  return {
+    label: 'Review Request',
+    owner: 'Store Admin / Operator',
+    detail: 'Review the request status and line quantities.',
+    tone: 'default',
+  }
+}
+
 export type FulfillmentLine = {
   requestedQty: number
   approvedQty: number
@@ -109,7 +230,7 @@ export type FulfillmentLine = {
  * demand before it is approved. `reservedNow = availableQty − issuedQty` is the gate.
  */
 export function deriveFulfillmentStatus(line: FulfillmentLine, hasOpenPoForLine: boolean): string {
-  if (line.status === 'Cancelled' || line.status === 'Rejected') return FULFILLMENT_STATUS.CANCELLED
+  if (line.status === LINE_STATUS.CANCELLED || line.status === LINE_STATUS.REJECTED) return FULFILLMENT_STATUS.CANCELLED
   const committedQty = line.approvedQty > 0 ? line.approvedQty : line.requestedQty
   const reservedNow = Math.max(0, line.availableQty - line.issuedQty)
   if (committedQty > 0 && line.issuedQty >= committedQty && line.pendingPurchaseQty <= 0) {

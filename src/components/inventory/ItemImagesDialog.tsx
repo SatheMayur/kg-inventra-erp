@@ -226,7 +226,6 @@ export function ItemImagesDialog({ itemId, itemName, isLiquid, open, onOpenChang
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-80 overflow-y-auto pr-1">
               {images.map((img) => (
                 <div key={img.id} className="relative group rounded-lg border border-border overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={img.thumbnailPath}
                     alt={itemName}
@@ -295,7 +294,6 @@ export function ItemImagesDialog({ itemId, itemName, isLiquid, open, onOpenChang
             )}
           </DialogTitle>
           {lightbox && (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={lightbox.imagePath} alt={itemName} className="w-full max-h-[78vh] object-contain rounded-md" />
           )}
         </DialogContent>

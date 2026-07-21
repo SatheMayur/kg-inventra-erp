@@ -43,7 +43,7 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       const res = await api.auth.login(cleanEmpId, password) as LoginResponse
-      setUser({ ...res.user, role: res.user.role as 'admin' | 'employee' }, res.token)
+      setUser({ ...res.user, role: res.user.role as 'admin' | 'employee' })
       toast.success(`Welcome back, ${res.user.name}!`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Invalid credentials. Please try again.'
@@ -163,7 +163,7 @@ export default function LoginScreen() {
               {loading ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Signing in…
+                  Signing in...
                 </>
               ) : (
                 <>

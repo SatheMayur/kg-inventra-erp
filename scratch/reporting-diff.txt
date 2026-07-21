@@ -1,0 +1,659 @@
+diff --git a/src/components/views/reporting-view.tsx b/src/components/views/reporting-view.tsx
+index 9f08dc3..85bf09f 100644
+--- a/src/components/views/reporting-view.tsx
++++ b/src/components/views/reporting-view.tsx
+@@ -12,6 +12,11 @@ import {
+   DollarSign,
+   Users,
+   ArrowLeftRight,
++  FileDown,
++  Activity,
++  History,
++  Calendar,
++  FileText,
+ } from 'lucide-react'
+ import {
+   BarChart,
+@@ -95,6 +100,29 @@ export default function ReportingView() {
+   const [itemFlow, setItemFlow] = useState<ItemFlowResponse | null>(null)
+   const [flowLoading, setFlowLoading] = useState(false)
+ 
++  const [histData, setHistData] = useState<{ totalQuantity: number; totalSpent: number; deptConsumption: any[]; topItems: any[] } | null>(null)
++  const [histLoading, setHistLoading] = useState(false)
++
++  // Machine Consumption Report states
++  const [machineData, setMachineData] = useState<any[]>([])
++  const [machineLoading, setMachineLoading] = useState(false)
++  const [machineLoaded, setMachineLoaded] = useState(false)
++
++  // Requisitions Aging Tracker states
++  const [agingData, setAgingData] = useState<any[]>([])
++  const [agingLoading, setAgingLoading] = useState(false)
++  const [agingLoaded, setAgingLoaded] = useState(false)
++
++  // Pending POs & Delivery states
++  const [poTrackingData, setPoTrackingData] = useState<any[]>([])
++  const [poTrackingLoading, setPoTrackingLoading] = useState(false)
++  const [poTrackingLoaded, setPoTrackingLoaded] = useState(false)
++
++  // Sourcing History states
++  const [sourcingData, setSourcingData] = useState<any[]>([])
++  const [sourcingLoading, setSourcingLoading] = useState(false)
++  const [sourcingLoaded, setSourcingLoaded] = useState(false)
++
+   // Check if reporting flag is on
+   const reportingEnabled = flags.reporting !== false
+ 
+@@ -169,6 +197,123 @@ export default function ReportingView() {
+     if (reportingEnabled) fetchItemFlow()
+   }, [fetchItemFlow, reportingEnabled])
+ 
++  const fetchHistorical = useCallback(async () => {
++    try {
++      setHistLoading(true)
++      const data = await api.reporting.historicalConsumption()
++      setHistData(data)
++    } catch {
++      toast.error('Failed to load historical consumption data')
++    } finally {
++      setHistLoading(false)
++    }
++  }, [])
++
++  const fetchMachineConsumption = useCallback(async () => {
++    try {
++      setMachineLoading(true)
++      const res = await api.reporting.machineConsumption()
++      setMachineData(res.consumption)
++      setMachineLoaded(true)
++    } catch {
++      toast.error('Failed to load machine consumption report')
++    } finally {
++      setMachineLoading(false)
++    }
++  }, [])
++
++  const fetchRequisitionsAging = useCallback(async () => {
++    try {
++      setAgingLoading(true)
++      const res = await api.reporting.requisitionsAging()
++      setAgingData(res.requisitions)
++      setAgingLoaded(true)
++    } catch {
++      toast.error('Failed to load requisitions aging report')
++    } finally {
++      setAgingLoading(false)
++    }
++  }, [])
++
++  const fetchPOTracking = useCallback(async () => {
++    try {
++      setPoTrackingLoading(true)
++      const res = await api.reporting.purchaseOrdersTracking()
++      setPoTrackingData(res.purchaseOrders)
++      setPoTrackingLoaded(true)
++    } catch {
++      toast.error('Failed to load purchase orders tracking report')
++    } finally {
++      setPoTrackingLoading(false)
++    }
++  }, [])
++
++  const fetchSourcingHistory = useCallback(async () => {
++    try {
++      setSourcingLoading(true)
++      const res = await api.reporting.sourcingHistory()
++      setSourcingData(res.sourcingHistory)
++      setSourcingLoaded(true)
++    } catch {
++      toast.error('Failed to load sourcing history report')
++    } finally {
++      setSourcingLoading(false)
++    }
++  }, [])
++
++  const exportToCSV = (data: any[], headers: string[], filename: string) => {
++    if (!data || data.length === 0) {
++      toast.error('No data to export')
++      return
++    }
++    const csvRows = []
++    csvRows.push(headers.join(','))
++    
++    for (const row of data) {
++      const values = headers.map(header => {
++        const val = row[header]
++        const escaped = ('' + (val ?? '')).replace(/"/g, '""')
++        return `"${escaped}"`
++      })
++      csvRows.push(values.join(','))
++    }
++    
++    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' })
++    const url = URL.createObjectURL(blob)
++    const link = document.createElement('a')
++    link.setAttribute('href', url)
++    link.setAttribute('download', `${filename}.csv`)
++    link.style.visibility = 'hidden'
++    document.body.appendChild(link)
++    link.click()
++    document.body.removeChild(link)
++  }
++
++  const handleExportPOTracking = () => {
++    const flatData = poTrackingData.flatMap(po => 
++      po.items.map((pi: any) => ({
++        poNumber: po.poNumber,
++        supplierName: po.supplierName,
++        status: po.status,
++        createdAt: new Date(po.createdAt).toLocaleDateString(),
++        expectedDeliveryDate: po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString() : 'N/A',
++        ageInDays: po.ageInDays,
++        totalAmount: po.totalAmount,
++        itemName: pi.itemName,
++        orderedQty: pi.orderedQty,
++        receivedQty: pi.receivedQty,
++        pendingQty: pi.pendingQty,
++        unit: pi.unit,
++        unitPrice: pi.unitPrice
++      }))
++    )
++    exportToCSV(
++      flatData,
++      ['poNumber', 'supplierName', 'status', 'createdAt', 'expectedDeliveryDate', 'ageInDays', 'totalAmount', 'itemName', 'orderedQty', 'receivedQty', 'pendingQty', 'unit', 'unitPrice'],
++      'purchase_orders_delivery_tracking'
++    )
++  }
++
+   const formatCurrency = (val: number) => 
+     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val)
+ 
+@@ -251,8 +396,7 @@ export default function ReportingView() {
+         </Button>
+       </div>
+ 
+-      <Tabs defaultValue="overview">
+-        <TabsList className="mb-4">
++        <TabsList className="mb-4 flex flex-wrap h-auto gap-1 bg-muted/30 p-1">
+           <TabsTrigger value="overview">
+             <BarChart3 className="size-3.5 mr-1.5" />
+             Overview
+@@ -269,6 +413,26 @@ export default function ReportingView() {
+             <ArrowLeftRight className="size-3.5 mr-1.5" />
+             Item Flow
+           </TabsTrigger>
++          <TabsTrigger value="machine-consumption" onClick={() => { if (!machineLoaded) fetchMachineConsumption() }}>
++            <Activity className="size-3.5 mr-1.5" />
++            Machine Consumption
++          </TabsTrigger>
++          <TabsTrigger value="requisitions-aging" onClick={() => { if (!agingLoaded) fetchRequisitionsAging() }}>
++            <Clock className="size-3.5 mr-1.5" />
++            Requisitions Aging
++          </TabsTrigger>
++          <TabsTrigger value="po-tracking" onClick={() => { if (!poTrackingLoaded) fetchPOTracking() }}>
++            <Calendar className="size-3.5 mr-1.5" />
++            PO & Delivery
++          </TabsTrigger>
++          <TabsTrigger value="sourcing-history" onClick={() => { if (!sourcingLoaded) fetchSourcingHistory() }}>
++            <History className="size-3.5 mr-1.5" />
++            Sourcing History
++          </TabsTrigger>
++          <TabsTrigger value="historical" onClick={fetchHistorical}>
++            <Clock className="size-3.5 mr-1.5" />
++            Historical Seeding
++          </TabsTrigger>
+         </TabsList>
+ 
+         {/* ── Overview tab (existing content, unchanged) ── */}
+@@ -868,6 +1032,451 @@ export default function ReportingView() {
+             </CardContent>
+           </Card>
+         </TabsContent>
++
++        <TabsContent value="historical" className="space-y-4">
++          {/* Stat cards */}
++          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
++            <Card className="border-border bg-card">
++              <CardContent className="pt-6">
++                {histLoading ? (
++                  <Skeleton className="h-10 w-48" />
++                ) : (
++                  <div className="flex items-center gap-3">
++                    <TrendingUp className="size-8 text-primary" />
++                    <div>
++                      <p className="text-2xl font-bold text-foreground">
++                        {(histData?.totalQuantity ?? 0).toLocaleString()}
++                      </p>
++                      <p className="text-xs text-muted-foreground">Total Quantity Consumed (Seeded)</p>
++                    </div>
++                  </div>
++                )}
++              </CardContent>
++            </Card>
++
++            <Card className="border-border bg-card">
++              <CardContent className="pt-6">
++                {histLoading ? (
++                  <Skeleton className="h-10 w-48" />
++                ) : (
++                  <div className="flex items-center gap-3">
++                    <DollarSign className="size-8 text-emerald-500" />
++                    <div>
++                      <p className="text-2xl font-bold text-foreground">
++                        {formatCurrency(histData?.totalSpent ?? 0)}
++                      </p>
++                      <p className="text-xs text-muted-foreground">Total Consumption Value (Seeded)</p>
++                    </div>
++                  </div>
++                )}
++              </CardContent>
++            </Card>
++          </div>
++
++          {/* Charts Grid */}
++          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
++            {/* Department Consumption */}
++            <Card className="border-border bg-card">
++              <CardHeader className="pb-2">
++                <CardTitle className="text-base">Historical Department Analysis</CardTitle>
++              </CardHeader>
++              <CardContent>
++                {histLoading ? (
++                  <Skeleton className="h-[280px] w-full" />
++                ) : !histData || histData.deptConsumption.length === 0 ? (
++                  <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
++                    No historical department data seeded
++                  </div>
++                ) : (
++                  <ResponsiveContainer width="100%" height={280}>
++                    <BarChart data={histData.deptConsumption} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
++                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
++                      <XAxis
++                        dataKey="department"
++                        tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
++                        axisLine={{ stroke: 'var(--border)' }}
++                        tickLine={{ stroke: 'var(--border)' }}
++                      />
++                      <YAxis
++                        tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
++                        axisLine={{ stroke: 'var(--border)' }}
++                        tickLine={{ stroke: 'var(--border)' }}
++                        tickFormatter={(val) => `₹${val >= 1000 ? (val / 1000).toFixed(0) + 'k' : val}`}
++                      />
++                      <RechartsTooltip
++                        {...tooltipStyle}
++                        formatter={(val: number) => [formatCurrency(val), 'Value Spent']}
++                      />
++                      <Bar dataKey="spending" radius={[4, 4, 0, 0]}>
++                        {histData.deptConsumption.map((_, index) => (
++                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
++                        ))}
++                      </Bar>
++                    </BarChart>
++                  </ResponsiveContainer>
++                )}
++              </CardContent>
++            </Card>
++
++            {/* Top Consumed Items */}
++            <Card className="border-border bg-card">
++              <CardHeader className="pb-2">
++                <CardTitle className="text-base">Top Seeded Consumed Items</CardTitle>
++              </CardHeader>
++              <CardContent>
++                {histLoading ? (
++                  <Skeleton className="h-[280px] w-full" />
++                ) : !histData || histData.topItems.length === 0 ? (
++                  <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
++                    No historical item data seeded
++                  </div>
++                ) : (
++                  <ResponsiveContainer width="100%" height={280}>
++                    <BarChart layout="vertical" data={histData.topItems} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
++                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
++                      <XAxis
++                        type="number"
++                        tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
++                        axisLine={{ stroke: 'var(--border)' }}
++                        tickLine={{ stroke: 'var(--border)' }}
++                      />
++                      <YAxis
++                        type="category"
++                        dataKey="itemName"
++                        tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }}
++                        axisLine={{ stroke: 'var(--border)' }}
++                        tickLine={{ stroke: 'var(--border)' }}
++                        width={120}
++                      />
++                      <RechartsTooltip {...tooltipStyle} />
++                      <Bar dataKey="qty" radius={[0, 4, 4, 0]} fill="#fb923c" />
++                    </BarChart>
++                  </ResponsiveContainer>
++                )}
++              </CardContent>
++            </Card>
++          </div>
++        </TabsContent>
++
++        {/* ── Machine Consumption Tab Content ── */}
++        <TabsContent value="machine-consumption" className="space-y-4">
++          <Card className="border-border bg-card">
++            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
++              <CardTitle className="text-base flex items-center gap-2">
++                <Activity className="size-4 text-primary animate-pulse" />
++                Machine & Cost Center Consumption Analysis
++              </CardTitle>
++              <Button
++                variant="outline"
++                size="sm"
++                onClick={() => exportToCSV(
++                  machineData,
++                  ['machine', 'department', 'itemName', 'category', 'totalQty', 'unit', 'totalSpent', 'lastIssued'],
++                  'machine_consumption_report'
++                )}
++                disabled={machineLoading || machineData.length === 0}
++                className="gap-1.5"
++              >
++                <FileDown className="size-3.5" />
++                Export CSV
++              </Button>
++            </CardHeader>
++            <CardContent>
++              {machineLoading ? (
++                <div className="space-y-2">
++                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
++                </div>
++              ) : machineData.length === 0 ? (
++                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground italic">
++                  <Activity className="mb-2 size-8 opacity-30" />
++                  No machine consumption data found.
++                </div>
++              ) : (
++                <div className="overflow-auto max-h-[480px]">
++                  <table className="w-full text-sm">
++                    <thead>
++                      <tr className="border-b border-border/50 text-left text-xs text-muted-foreground sticky top-0 bg-card">
++                        <th className="pb-2 pr-4 font-medium">Machine / Cost Center</th>
++                        <th className="pb-2 pr-4 font-medium">Department</th>
++                        <th className="pb-2 pr-4 font-medium">Item Name</th>
++                        <th className="pb-2 pr-4 font-medium">Category</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Qty Consumed</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Total Cost</th>
++                        <th className="pb-2 font-medium">Last Issued</th>
++                      </tr>
++                    </thead>
++                    <tbody>
++                      {machineData.map((row, idx) => (
++                        <tr key={idx} className="border-b border-border/20 last:border-0 hover:bg-muted/5">
++                          <td className="py-2.5 pr-4 font-semibold text-primary">{row.machine}</td>
++                          <td className="py-2.5 pr-4 text-muted-foreground">{row.department}</td>
++                          <td className="py-2.5 pr-4 font-medium">{row.itemName}</td>
++                          <td className="py-2.5 pr-4">
++                            <Badge variant="outline" className="text-[10px] bg-muted/10">{row.category}</Badge>
++                          </td>
++                          <td className="py-2.5 pr-4 text-right font-medium">{row.totalQty} {row.unit}</td>
++                          <td className="py-2.5 pr-4 text-right font-bold text-amber-600">₹{row.totalSpent.toLocaleString()}</td>
++                          <td className="py-2.5 text-xs text-muted-foreground">{new Date(row.lastIssued).toLocaleDateString()}</td>
++                        </tr>
++                      ))}
++                    </tbody>
++                  </table>
++                </div>
++              )}
++            </CardContent>
++          </Card>
++        </TabsContent>
++
++        {/* ── Requisitions Aging Tab Content ── */}
++        <TabsContent value="requisitions-aging" className="space-y-4">
++          <Card className="border-border bg-card">
++            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
++              <CardTitle className="text-base flex items-center gap-2">
++                <Clock className="size-4 text-primary" />
++                Pending Requisitions Aging Tracker
++              </CardTitle>
++              <Button
++                variant="outline"
++                size="sm"
++                onClick={() => exportToCSV(
++                  agingData,
++                  ['requestNumber', 'employee', 'department', 'machine', 'createdAt', 'ageInDays', 'status', 'totalItemsRequested', 'totalItemsIssued', 'estimatedValue', 'priority'],
++                  'requisitions_aging_report'
++                )}
++                disabled={agingLoading || agingData.length === 0}
++                className="gap-1.5"
++              >
++                <FileDown className="size-3.5" />
++                Export CSV
++              </Button>
++            </CardHeader>
++            <CardContent>
++              {agingLoading ? (
++                <div className="space-y-2">
++                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
++                </div>
++              ) : agingData.length === 0 ? (
++                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground italic">
++                  <Check className="mb-2 size-8 text-emerald-500" />
++                  All requisitions are fully processed. No pending requests.
++                </div>
++              ) : (
++                <div className="overflow-auto max-h-[480px]">
++                  <table className="w-full text-sm">
++                    <thead>
++                      <tr className="border-b border-border/50 text-left text-xs text-muted-foreground sticky top-0 bg-card">
++                        <th className="pb-2 pr-4 font-medium">Requisition No.</th>
++                        <th className="pb-2 pr-4 font-medium">Age</th>
++                        <th className="pb-2 pr-4 font-medium">Employee</th>
++                        <th className="pb-2 pr-4 font-medium">Dept / Machine</th>
++                        <th className="pb-2 pr-4 font-medium">Priority</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Items (Req / Iss)</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Est. Value</th>
++                        <th className="pb-2 font-medium">Status</th>
++                      </tr>
++                    </thead>
++                    <tbody>
++                      {agingData.map((row) => {
++                        let ageColor = 'text-emerald-500'
++                        let ageBg = 'bg-emerald-500/10'
++                        if (row.ageInDays >= 14) {
++                          ageColor = 'text-rose-500'
++                          ageBg = 'bg-rose-500/10'
++                        } else if (row.ageInDays >= 7) {
++                          ageColor = 'text-orange-500'
++                          ageBg = 'bg-orange-500/10'
++                        } else if (row.ageInDays >= 3) {
++                          ageColor = 'text-amber-500'
++                          ageBg = 'bg-amber-500/10'
++                        }
++                        return (
++                          <tr key={row.id} className="border-b border-border/20 last:border-0 hover:bg-muted/5">
++                            <td className="py-2.5 pr-4 font-semibold text-primary">{row.requestNumber}</td>
++                            <td className="py-2.5 pr-4">
++                              <Badge className={`text-xs ${ageBg} ${ageColor} border-0`}>
++                                {row.ageInDays} days
++                              </Badge>
++                            </td>
++                            <td className="py-2.5 pr-4 font-medium">{row.employee}</td>
++                            <td className="py-2.5 pr-4 text-xs">
++                              <span className="font-semibold text-muted-foreground">{row.department}</span>
++                              {row.machine && row.machine !== 'N/A' && (
++                                <span className="block text-[10px] text-amber-600 font-semibold">{row.machine}</span>
++                              )}
++                            </td>
++                            <td className="py-2.5 pr-4">
++                              <Badge variant="outline" className={`text-[10px] ${row.priority === 'HIGH' || row.priority === 'CRITICAL' ? 'border-rose-500 text-rose-500 bg-rose-500/5' : 'text-muted-foreground'}`}>
++                                {row.priority}
++                              </Badge>
++                            </td>
++                            <td className="py-2.5 pr-4 text-right text-xs">
++                              <span className="font-semibold">{row.totalItemsRequested}</span>
++                              <span className="text-muted-foreground"> / {row.totalItemsIssued}</span>
++                            </td>
++                            <td className="py-2.5 pr-4 text-right font-bold text-amber-600">₹{row.estimatedValue.toLocaleString()}</td>
++                            <td className="py-2.5 text-xs font-medium">{row.status}</td>
++                          </tr>
++                        );
++                      })}
++                    </tbody>
++                  </table>
++                </div>
++              )}
++            </CardContent>
++          </Card>
++        </TabsContent>
++
++        {/* ── PO & Delivery Tracking Tab Content ── */}
++        <TabsContent value="po-tracking" className="space-y-4">
++          <Card className="border-border bg-card">
++            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
++              <CardTitle className="text-base flex items-center gap-2">
++                <Calendar className="size-4 text-primary" />
++                Pending Purchase Orders & Delivery Tracker
++              </CardTitle>
++              <Button
++                variant="outline"
++                size="sm"
++                onClick={handleExportPOTracking}
++                disabled={poTrackingLoading || poTrackingData.length === 0}
++                className="gap-1.5"
++              >
++                <FileDown className="size-3.5" />
++                Export CSV
++              </Button>
++            </CardHeader>
++            <CardContent>
++              {poTrackingLoading ? (
++                <div className="space-y-2">
++                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
++                </div>
++              ) : poTrackingData.length === 0 ? (
++                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground italic">
++                  <Check className="mb-2 size-8 text-emerald-500" />
++                  No pending Purchase Orders. All orders are closed or received.
++                </div>
++              ) : (
++                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
++                  {poTrackingData.map((po) => (
++                    <div key={po.id} className="rounded-xl border border-border bg-muted/5 p-4 space-y-3">
++                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/40 pb-2">
++                        <div className="space-y-0.5">
++                          <div className="flex items-center gap-2">
++                            <span className="font-extrabold text-sm text-primary">{po.poNumber}</span>
++                            <Badge className="text-[10px] bg-primary/10 text-primary border-primary/20">{po.status}</Badge>
++                          </div>
++                          <p className="text-xs font-semibold text-muted-foreground">Supplier: <span className="text-foreground">{po.supplierName}</span></p>
++                        </div>
++                        <div className="text-right">
++                          <p className="text-sm font-bold text-amber-600">₹{po.totalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
++                          <p className="text-[10px] text-muted-foreground">Age: {po.ageInDays} days · Expected: {po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).toLocaleDateString() : 'N/A'}</p>
++                        </div>
++                      </div>
++                      
++                      <div className="overflow-x-auto rounded-lg border border-border/30">
++                        <table className="w-full text-xs">
++                          <thead className="bg-muted/10">
++                            <tr className="border-b border-border/20 text-left text-muted-foreground">
++                              <th className="p-2 font-medium">Item Name</th>
++                              <th className="p-2 font-medium text-right">Ordered Qty</th>
++                              <th className="p-2 font-medium text-right">Received Qty</th>
++                              <th className="p-2 font-medium text-right">Pending Delivery</th>
++                              <th className="p-2 font-medium text-right">Unit Price</th>
++                            </tr>
++                          </thead>
++                          <tbody>
++                            {po.items.map((pi: any, itemIdx: number) => (
++                              <tr key={itemIdx} className="border-b border-border/10 last:border-0 hover:bg-muted/10">
++                                <td className="p-2 font-medium">{pi.itemName}</td>
++                                <td className="p-2 text-right">{pi.orderedQty} {pi.unit}</td>
++                                <td className="p-2 text-right text-emerald-500 font-medium">{pi.receivedQty} {pi.unit}</td>
++                                <td className={`p-2 text-right font-bold ${pi.pendingQty > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
++                                  {pi.pendingQty} {pi.unit}
++                                </td>
++                                <td className="p-2 text-right font-medium">₹{pi.unitPrice}</td>
++                              </tr>
++                            ))}
++                          </tbody>
++                        </table>
++                      </div>
++                    </div>
++                  ))}
++                </div>
++              )}
++            </CardContent>
++          </Card>
++        </TabsContent>
++
++        {/* ── Sourcing History Tab Content ── */}
++        <TabsContent value="sourcing-history" className="space-y-4">
++          <Card className="border-border bg-card">
++            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
++              <CardTitle className="text-base flex items-center gap-2">
++                <History className="size-4 text-primary" />
++                Sourcing Purchase History & Rates Analytics
++              </CardTitle>
++              <Button
++                variant="outline"
++                size="sm"
++                onClick={() => exportToCSV(
++                  sourcingData,
++                  ['itemCode', 'itemName', 'category', 'preferredSupplier', 'lastPurchaseRate', 'avgPurchaseRate', 'totalQtyOrdered', 'unit', 'lastPurchaseDate'],
++                  'sourcing_purchase_history'
++                )}
++                disabled={sourcingLoading || sourcingData.length === 0}
++                className="gap-1.5"
++              >
++                <FileDown className="size-3.5" />
++                Export CSV
++              </Button>
++            </CardHeader>
++            <CardContent>
++              {sourcingLoading ? (
++                <div className="space-y-2">
++                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
++                </div>
++              ) : sourcingData.length === 0 ? (
++                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground italic">
++                  <History className="mb-2 size-8 opacity-30" />
++                  No purchase history available. Purchase orders must be approved first.
++                </div>
++              ) : (
++                <div className="overflow-auto max-h-[480px]">
++                  <table className="w-full text-sm">
++                    <thead>
++                      <tr className="border-b border-border/50 text-left text-xs text-muted-foreground sticky top-0 bg-card">
++                        <th className="pb-2 pr-4 font-medium">Item Code</th>
++                        <th className="pb-2 pr-4 font-medium">Item Name</th>
++                        <th className="pb-2 pr-4 font-medium">Category</th>
++                        <th className="pb-2 pr-4 font-medium">Preferred/Last Supplier</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Last Price</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Avg Price</th>
++                        <th className="pb-2 pr-4 font-medium text-right">Total Ordered</th>
++                        <th className="pb-2 font-medium">Last Purchase Date</th>
++                      </tr>
++                    </thead>
++                    <tbody>
++                      {sourcingData.map((row) => (
++                        <tr key={row.itemId} className="border-b border-border/20 last:border-0 hover:bg-muted/5">
++                          <td className="py-2.5 pr-4 font-semibold text-muted-foreground text-xs">{row.itemCode}</td>
++                          <td className="py-2.5 pr-4 font-bold text-foreground">{row.itemName}</td>
++                          <td className="py-2.5 pr-4">
++                            <Badge variant="outline" className="text-[10px] bg-muted/10">{row.category}</Badge>
++                          </td>
++                          <td className="py-2.5 pr-4 font-medium text-muted-foreground">{row.preferredSupplier}</td>
++                          <td className="py-2.5 pr-4 text-right font-extrabold text-foreground">₹{row.lastPurchaseRate.toLocaleString()}</td>
++                          <td className="py-2.5 pr-4 text-right font-bold text-amber-600">₹{row.avgPurchaseRate.toLocaleString()}</td>
++                          <td className="py-2.5 pr-4 text-right font-medium">{row.totalQtyOrdered} {row.unit}</td>
++                          <td className="py-2.5 text-xs text-muted-foreground">{new Date(row.lastPurchaseDate).toLocaleDateString()}</td>
++                        </tr>
++                      ))}
++                    </tbody>
++                  </table>
++                </div>
++              )}
++            </CardContent>
++          </Card>
++        </TabsContent>
+       </Tabs>
+     </div>
+   )

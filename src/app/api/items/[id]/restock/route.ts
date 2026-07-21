@@ -33,6 +33,7 @@ export async function POST(
       await tx.transaction.create({
         data: {
           type: 'IN',
+          subType: 'ADJUST',
           itemId: id,
           itemName: item.name,
           qty,

@@ -19,8 +19,9 @@ interface ItemThumbProps {
  */
 export function ItemThumb({ photoUrl, name, size = 40, fullUrl }: ItemThumbProps) {
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState(false)
 
-  if (!photoUrl) {
+  if (!photoUrl || error) {
     return (
       <div
         className="flex items-center justify-center rounded-md bg-muted/40 text-muted-foreground/40 shrink-0"
@@ -34,13 +35,13 @@ export function ItemThumb({ photoUrl, name, size = 40, fullUrl }: ItemThumbProps
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={photoUrl}
         alt={name}
         loading="lazy"
         className="rounded-md object-cover cursor-zoom-in border border-border shrink-0"
         style={{ width: size, height: size }}
+        onError={() => setError(true)}
         onClick={(e) => {
           e.stopPropagation()
           setOpen(true)
@@ -49,7 +50,6 @@ export function ItemThumb({ photoUrl, name, size = 40, fullUrl }: ItemThumbProps
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-2xl border-border p-2">
           <DialogTitle className="px-2 pt-1 text-sm">{name}</DialogTitle>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={fullUrl ?? photoUrl}
             alt={name}

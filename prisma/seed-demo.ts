@@ -147,11 +147,17 @@ async function main() {
         userId: u.id,
         employee: u.name,
         department: u.department,
-        itemId: it.id,
-        itemName: it.name,
-        qty: 1 + i,
         note: 'Demo request',
         status: i === 0 ? 'Approved' : 'Pending',
+        lines: {
+          create: [{
+            itemId: it.id,
+            itemName: it.name,
+            requestedQty: 1 + i,
+            approvedQty: i === 0 ? 1 + i : 0,
+            status: i === 0 ? 'Approved' : 'Pending',
+          }],
+        },
       },
     })
   }

@@ -1,7 +1,9 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+let prisma;
 
 async function main() {
+  const { PrismaClient } = await import('@prisma/client');
+  prisma = new PrismaClient();
+
   const suppliers = await prisma.supplier.findMany();
   console.log('Suppliers:', JSON.stringify(suppliers, null, 2));
   
@@ -11,4 +13,4 @@ async function main() {
 
 main()
   .catch(e => console.error(e))
-  .finally(async () => await prisma.$disconnect());
+  .finally(async () => prisma && await prisma.$disconnect());

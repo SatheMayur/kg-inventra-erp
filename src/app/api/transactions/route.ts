@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { Prisma } from '@prisma/client';
 import { authorize } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-utils';
+import { getKolkataDateBounds } from '@/lib/date-utils';
 
 const PERIOD_MS: Record<string, number> = {
   '7d':  7  * 24 * 60 * 60 * 1000,
@@ -20,21 +21,26 @@ export async function GET(request: NextRequest) {
     const type   = searchParams.get('type');
     const date   = searchParams.get('date');
     const period = searchParams.get('period');
+    const itemId = searchParams.get('itemId');
 
     const where: Prisma.TransactionWhereInput = {};
 
-    // Employees can only see their own transactions
-    if (auth.user?.role === 'employee') {
+    // Department requesters only see their own ledger activity. Department heads
+    // are scoped to their department; operational/reporting roles can see all.
+    if (auth.user?.role === 'employee' || auth.user?.role === 'DEPT_USER') {
       where.userId = auth.user.id;
+    } else if (auth.user?.role === 'DEPT_HEAD') {
+      where.user = { department: auth.user.department };
+      if (userId) where.userId = userId;
     } else if (userId) {
       where.userId = userId;
     }
 
     if (type) where.type = type;
+    if (itemId) where.itemId = itemId;
 
     if (date) {
-      const start = new Date(date); start.setHours(0, 0, 0, 0);
-      const end   = new Date(date); end.setHours(23, 59, 59, 999);
+      const { start, end } = getKolkataDateBounds(date);
       where.date = { gte: start, lte: end };
     } else if (period && period !== 'all' && PERIOD_MS[period]) {
       where.date = { gte: new Date(Date.now() - PERIOD_MS[period]) };

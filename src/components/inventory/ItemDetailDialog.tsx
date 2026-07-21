@@ -33,8 +33,8 @@ export function ItemDetailDialog({ item, onOpenChange }: Props) {
           setImages(d.images)
           setBigImage(d.images[0]?.imagePath ?? null)
         }),
-      api.transactions.list().then((all) => {
-        setMoves(all.filter((t) => t.itemId === item.id).slice(0, 8))
+      api.transactions.list({ itemId: item.id }).then((itemMoves) => {
+        setMoves(itemMoves.slice(0, 8))
       }),
     ])
       .catch(() => {})
@@ -62,7 +62,6 @@ export function ItemDetailDialog({ item, onOpenChange }: Props) {
             {/* Photo side */}
             <div className="space-y-2">
               {bigImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={bigImage} alt={item.name} className="w-full aspect-square object-cover rounded-xl border border-border" />
               ) : (
                 <div className="w-full aspect-square rounded-xl border border-dashed border-border flex items-center justify-center text-muted-foreground text-xs">
@@ -72,7 +71,6 @@ export function ItemDetailDialog({ item, onOpenChange }: Props) {
               {images.length > 1 && (
                 <div className="flex gap-1.5 overflow-x-auto">
                   {images.map((img) => (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={img.id}
                       src={img.thumbnailPath}
@@ -142,6 +140,38 @@ export function ItemDetailDialog({ item, onOpenChange }: Props) {
                   </div>
                 )}
               </div>
+            </div>
+            
+            {/* Full Specifications Grid */}
+            <div className="col-span-full border-t border-border/40 pt-4 mt-2">
+              <h4 className="font-semibold text-foreground text-[11px] uppercase tracking-wider mb-3 text-primary">Item Specifications</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Item Code (SKU)</span>
+                  <span className="font-medium font-mono bg-muted/40 px-1 py-0.5 rounded text-[11px]">{item.itemCode || 'N/A'}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase text-muted-foreground font-semibold block">HSN / GST</span>
+                  <span className="font-medium">{item.hsnCode || 'N/A'} {item.gstRate !== undefined ? `(${item.gstRate}%)` : ''}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Storage Location</span>
+                  <span className="font-medium text-ellipsis overflow-hidden whitespace-nowrap block" title={item.warehouse || 'N/A'}>
+                    {item.warehouse || 'N/A'} 
+                    {item.rack || item.shelf || item.bin ? ` (R:${item.rack || '-'} S:${item.shelf || '-'} B:${item.bin || '-'})` : ''}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] uppercase text-muted-foreground font-semibold block">Limits (Max/Safety/Reo)</span>
+                  <span className="font-medium">Max: {item.maxStock || 'N/A'} / Saf: {item.safetyStock || 'N/A'} / Reo: {item.reorderQty || 'N/A'}</span>
+                </div>
+              </div>
+              {item.description && (
+                <div className="mt-3 bg-muted/20 border border-border/40 rounded-lg p-2 text-xs">
+                  <span className="text-[10px] uppercase text-muted-foreground font-semibold block mb-1">Description</span>
+                  <p className="text-muted-foreground leading-normal">{item.description}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

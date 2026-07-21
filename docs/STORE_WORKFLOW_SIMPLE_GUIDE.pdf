@@ -1,0 +1,370 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 5205 >>
+stream
+q
+0.98 0.99 1 rg
+0 0 595 842 re f
+Q
+q
+0.05 0.12 0.18 rg
+0 748 595 94 re f
+Q
+BT
+/F2 21 Tf
+1 1 1 rg
+38 803 Td
+(KG Store Simple Workflow Guide) Tj
+ET
+BT
+/F1 10.5 Tf
+0.84 0.92 1 rg
+38 779 Td
+(One-page guide for request, purchase order, receiving, and issue flow) Tj
+ET
+BT
+/F1 9.2 Tf
+0.72 0.82 0.9 rg
+38 761 Td
+(Use this as the quick reference for daily store operations.) Tj
+ET
+q
+1 1 1 rg
+0.82 0.87 0.92 RG 0.7 w
+34 68 254 652 re B
+Q
+q
+1 1 1 rg
+0.82 0.87 0.92 RG 0.7 w
+307 68 254 652 re B
+Q
+BT
+/F2 9.5 Tf
+0.13 0.21 0.34 rg
+50 699 Td
+(MAIN FLOW) Tj
+ET
+q 0.35 0.49 0.72 RG 0.8 w
+50 692 232 0 m 282 692 l S
+Q
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 675 Td
+(1. Employee creates asset request.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 661.8 Td
+(2. Manager/Admin approves or rejects.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 648.5999999999999 Td
+(3. Store checks available stock.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 635.3999999999999 Td
+(4. If stock is enough: reserve and issue.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 622.1999999999998 Td
+(5. If stock is short: create PO/OP.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 608.9999999999998 Td
+(6. Add item cost, transport, SGST/GST.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 595.7999999999997 Td
+(7. Send order to vendor.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 582.5999999999997 Td
+(8. Store receives items against PO.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 569.3999999999996 Td
+(9. System adds received quantity to stock.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 556.1999999999996 Td
+(10. Store proceeds to issue items.) Tj
+ET
+BT
+/F2 9.5 Tf
+0.13 0.21 0.34 rg
+50 520 Td
+(COST FIELDS TO CAPTURE) Tj
+ET
+q 0.35 0.49 0.72 RG 0.8 w
+50 513 232 0 m 282 513 l S
+Q
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 496 Td
+(- Item unit price and quantity.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 482.8 Td
+(- Transportation / freight cost.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 469.6 Td
+(- SGST and GST values.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 456.40000000000003 Td
+(- Vendor and expected delivery date.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 443.20000000000005 Td
+(- Final total before confirming PO.) Tj
+ET
+BT
+/F2 9.5 Tf
+0.13 0.21 0.34 rg
+50 405 Td
+(IMPORTANT RULES) Tj
+ET
+q 0.35 0.49 0.72 RG 0.8 w
+50 398 232 0 m 282 398 l S
+Q
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 381 Td
+(- Do not issue more than available stock.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 367.8 Td
+(- Every shortage needs PO before issue.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 354.6 Td
+(- Receiving PO items must increase stock.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 341.40000000000003 Td
+(- Keep request status updated at each step.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+50 328.20000000000005 Td
+(- Recheck totals before closing purchase.) Tj
+ET
+BT
+/F2 9.5 Tf
+0.13 0.21 0.34 rg
+323 699 Td
+(STATUS MEANING) Tj
+ET
+q 0.35 0.49 0.72 RG 0.8 w
+323 692 232 0 m 555 692 l S
+Q
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 675 Td
+(- Pending: waiting for approval.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 661.8 Td
+(- Approved: request accepted.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 648.5999999999999 Td
+(- Shortage: stock is not available.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 635.3999999999999 Td
+(- PO Required: purchase must be created.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 622.1999999999998 Td
+(- PO Ordered: vendor order placed.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 608.9999999999998 Td
+(- Partially Received: some items received.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 595.7999999999997 Td
+(- Received: items added to stock.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 582.5999999999997 Td
+(- Issued: items given to employee.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 569.3999999999996 Td
+(- Rejected/Closed: no further action.) Tj
+ET
+BT
+/F2 9.5 Tf
+0.13 0.21 0.34 rg
+323 526 Td
+(WHO DOES WHAT) Tj
+ET
+q 0.35 0.49 0.72 RG 0.8 w
+323 519 232 0 m 555 519 l S
+Q
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 502 Td
+(- Employee: create request and track status.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 488.8 Td
+(- Manager/Admin: approve or reject.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 475.6 Td
+(- Store Manager: stock, PO, receive, issue.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 462.40000000000003 Td
+(- Purchase/Admin: vendor, cost, tax checks.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 449.20000000000005 Td
+(- Finance: verify totals when required.) Tj
+ET
+BT
+/F2 9.5 Tf
+0.13 0.21 0.34 rg
+323 411 Td
+(NEXT ACTION GUIDE) Tj
+ET
+q 0.35 0.49 0.72 RG 0.8 w
+323 404 232 0 m 555 404 l S
+Q
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 387 Td
+(- If Shortage: create PO/OP.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 373.8 Td
+(- If vendor delivers: receive PO items.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 360.6 Td
+(- If stock becomes available: issue items.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 347.40000000000003 Td
+(- If issue is done: request becomes Issued.) Tj
+ET
+BT
+/F1 9.2 Tf
+0.13 0.15 0.18 rg
+323 334.20000000000005 Td
+(- If rejected: close with clear reason.) Tj
+ET
+q
+0.91 0.95 0.99 rg
+0.78 0.86 0.94 RG 0.7 w
+34 28 527 26 re B
+Q
+BT
+/F2 9 Tf
+0.13 0.21 0.34 rg
+48 38 Td
+(Quick check: Request approved -> Stock checked -> PO if shortage -> Receive -> Issue -> Close) Tj
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000321 00000 n 
+0000000396 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+5653
+%%EOF

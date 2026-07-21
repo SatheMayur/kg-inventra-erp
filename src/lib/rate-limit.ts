@@ -12,12 +12,16 @@ interface Window {
 const store = new Map<string, Window>()
 
 // Prune expired entries every 5 minutes to prevent memory leaks
-setInterval(() => {
+const interval = setInterval(() => {
   const now = Date.now()
   for (const [key, win] of store.entries()) {
     if (win.resetAt < now) store.delete(key)
   }
 }, 5 * 60 * 1000)
+
+if (typeof interval.unref === 'function') {
+  interval.unref()
+}
 
 /**
  * @param key      Unique identifier (e.g. IP address or empId)

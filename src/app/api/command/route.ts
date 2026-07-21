@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     switch (cmd.type) {
       case 'lowStock': {
-        const items = await db.item.findMany({ where: { deletedAt: null }, take: 1000 });
+        const items = await db.item.findMany({ where: { deletedAt: null, active: true }, take: 1000 });
         const low = items
           .filter((i) => i.stock - i.reservedQty <= i.minStock)
           .map((i) => ({ id: i.id, name: i.name, stock: i.stock, minStock: i.minStock }));
@@ -27,18 +27,28 @@ export async function POST(request: NextRequest) {
         });
       }
       case 'pendingRequests': {
-        const reqs = await db.request.findMany({ where: { status: 'Pending' }, orderBy: { createdAt: 'desc' }, take: 50 });
+        const reqs = await db.request.findMany({
+          where: { status: 'Pending' },
+          include: { lines: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        });
         return NextResponse.json({
           intent: cmd.type,
           answer: reqs.length ? `${reqs.length} request(s) pending approval.` : 'No pending requests.',
-          data: reqs.map((r) => ({ id: r.id, name: r.itemName, qty: r.qty, employee: r.employee })),
+          data: reqs.map((r) => ({
+            id: r.id,
+            name: r.lines.map((line) => line.itemName).join(', '),
+            qty: r.lines.reduce((sum, line) => sum + line.requestedQty, 0),
+            employee: r.employee,
+          })),
         });
       }
       case 'stock':
       case 'findItem': {
         const q = cmd.query;
         // SQLite `contains` is case-sensitive; filter in JS over the (small) catalog.
-        const all = await db.item.findMany({ where: { deletedAt: null }, take: 1000 });
+        const all = await db.item.findMany({ where: { deletedAt: null, active: true }, take: 1000 });
         const matches = all
           .filter((i) => i.name.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
           .slice(0, 20);

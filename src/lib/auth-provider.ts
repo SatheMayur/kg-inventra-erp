@@ -28,7 +28,7 @@ export async function comparePassword(password: string, stored: string): Promise
   // Legacy SHA-256 path — allows existing accounts to log in
   if (!stored.startsWith(PREFIX)) {
     const legacy = createHash('sha256').update(password).digest('hex');
-    return legacy === stored;
+    return timingSafeEqual(legacy, stored);
   }
 
   const [, salt, expectedHash] = stored.split(':');
