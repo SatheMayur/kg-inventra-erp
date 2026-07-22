@@ -12,7 +12,8 @@ export type WhatsAppRealtimeEvent = {
   messageId?: string
   direction?: string | null
   status?: string | null
-  reason: 'created' | 'status-updated'
+  updatedAt?: string
+  reason: 'created' | 'status-updated' | 'bridge-polled' | 'bridge-timeout-requeued' | 'bridge-retries-exhausted'
 }
 
 export type WhatsAppSessionRealtimeEvent = {

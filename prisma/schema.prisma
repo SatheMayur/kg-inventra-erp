@@ -668,6 +668,9 @@ model WhatsAppMessage {
   status              String    @default("PENDING") // DRAFT | PENDING | PROCESSING | SENT | DELIVERED | READ | FAILED | PROCESSED
   messageType         String    @default("GENERAL") // REQUIREMENT_SENT | VENDOR_REPLY | USER_REPLY | SUPPLY_CONFIRMATION | SHORTAGE_MESSAGE | ALTERNATE_VENDOR_REQUEST | DELIVERY_UPDATE | SYSTEM_EVENT | MANUAL_NOTE | GENERAL
   error               String?
+  sendAttempts        Int       @default(0)
+  lastDequeuedAt      DateTime?
+  lastSendAttemptAt   DateTime?
   senderName          String? // Resolved name or WhatsApp pushName
   providerMessageId   String?   @unique
   providerTimestamp   DateTime?
