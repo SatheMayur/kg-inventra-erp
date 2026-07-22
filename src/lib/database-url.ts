@@ -19,9 +19,7 @@ export function resolveDatabaseUrl(rawUrl?: string, options: ResolveDatabaseUrlO
   const baseDir = options.baseDir ?? process.cwd()
 
   let targetUrl = dbUrl
-  if (!targetUrl) {
-    targetUrl = fallbackSqliteUrl
-  } else if (!targetUrl.startsWith('file:') && nodeEnv !== 'production' && !allowNonSqlite) {
+  if (!targetUrl || (!targetUrl.startsWith('file:') && !allowNonSqlite)) {
     targetUrl = fallbackSqliteUrl
   }
 
