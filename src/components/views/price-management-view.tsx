@@ -509,7 +509,7 @@ export default function PriceManagementView() {
                         <td className="p-3 text-right font-mono">₹{t.rate.toFixed(2)}</td>
                         <td className="p-3 text-right font-mono">{t.quantity}</td>
                         <td className="p-3 text-right font-mono font-semibold">₹{t.grossAmount.toFixed(2)}</td>
-                        <td className="p-3 text-muted-foreground">{t.supplier?.name || t.originalSupplierText || '—'}</td>
+                        <td className="p-3 text-muted-foreground">{t.supplier?.name || (t as any).originalSupplierText || '—'}</td>
                         <td className="p-3 font-mono text-muted-foreground">{t.invoiceNumber || '—'}</td>
                       </tr>
                     ))
