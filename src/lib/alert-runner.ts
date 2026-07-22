@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { isMailConfigured, sendAlert } from '@/lib/mailer'
 import { getKolkataDaysAhead } from './date-utils'
+import { createNotificationOnce } from './notifications'
 
 type RunInventoryAlertsOptions = {
   notificationUserId: string
@@ -87,18 +88,18 @@ export async function runInventoryAlerts({ notificationUserId, email }: RunInven
     })
   }
 
-  await Promise.all(
+  const notificationResults = await Promise.all(
     notifications.map((notification) =>
-      db.notification.create({
-        data: {
-          userId: notificationUserId,
-          title: notification.title,
-          message: notification.message,
-          type: 'warning',
-        },
+      createNotificationOnce({
+        userId: notificationUserId,
+        title: notification.title,
+        message: notification.message,
+        type: 'warning',
+        link: 'alerts',
       })
     )
   )
+  const createdNotifications = notificationResults.filter((result) => result.created).length
 
   let emailed = false
   if (email && isMailConfigured()) {
@@ -230,7 +231,8 @@ export async function runInventoryAlerts({ notificationUserId, email }: RunInven
   }
 
   return {
-    notified: notifications.length,
+    notified: createdNotifications,
+    activeAlerts: notifications.length,
     emailed,
     lowStock: lowStockItems.length,
     maintenanceDue: maintenanceAlerts.length,
