@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Loader2,
   Send,
@@ -427,36 +429,38 @@ export default function WhatsAppInboxView() {
   return (
     <div className="h-[calc(100vh-100px)] min-h-[600px] w-full max-w-full min-w-0 border border-border/60 rounded-2xl bg-card shadow-xs overflow-hidden flex flex-col animate-in fade-in duration-300 relative">
       
-      {/* 1. ConnectionStatusBar (Single Top Status Bar: Height 34px) */}
-      <div className="shrink-0 px-4 py-1 h-[36px] border-b border-border/40 bg-muted/40 flex items-center justify-between text-xs min-w-0 w-full gap-3">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {sessionStatus === 'CONNECTED' ? (
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 font-semibold text-[10px] uppercase px-2 py-0 gap-1 h-[20px] leading-[1.2] shrink-0">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Connected
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 font-semibold text-[10px] uppercase px-2 py-0 gap-1 h-[20px] leading-[1.2] shrink-0">
-              <span className="size-1.5 rounded-full bg-amber-500" /> Offline Mode
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground font-normal leading-snug truncate min-w-0">
-            {sessionStatus === 'CONNECTED'
-              ? 'WhatsApp bridge is connected. Live messages send and receive automatically.'
-              : 'Historical messages are available for review, but live messaging is currently disconnected.'}
-          </span>
-        </div>
+      {/* 1. ConnectionStatusBar (Single Top Status Bar: Height 36px) */}
+      <div className="shrink-0 px-3 py-1.5 border-b border-border/40 bg-card/80 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3 text-xs min-w-0 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {sessionStatus === 'CONNECTED' ? (
+              <Badge variant="success" className="font-bold text-[10px] uppercase px-2 py-0 gap-1 h-5 shrink-0">
+                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Connected
+              </Badge>
+            ) : (
+              <Badge variant="warning" className="font-bold text-[10px] uppercase px-2 py-0 gap-1 h-5 shrink-0">
+                <span className="size-1.5 rounded-full bg-amber-500" /> Offline Mode
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground font-normal leading-snug truncate min-w-0">
+              {sessionStatus === 'CONNECTED'
+                ? 'WhatsApp bridge is connected. Live messages send and receive automatically.'
+                : 'Historical messages are available for review, but live messaging is currently disconnected.'}
+            </span>
+          </div>
 
-        {sessionStatus !== 'CONNECTED' && isAdmin && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 gap-1 px-2 shrink-0"
-            onClick={() => setCurrentView('integrations')}
-          >
-            <ExternalLink className="size-3.5" /> Connection Settings
-          </Button>
-        )}
+          {sessionStatus !== 'CONNECTED' && isAdmin && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 hover:bg-amber-500/15 gap-1 px-2 shrink-0"
+              onClick={() => setCurrentView('integrations')}
+            >
+              <ExternalLink className="size-3.5" /> Connection Settings
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* 2. InboxShell (Parent Desktop Grid Contract) */}
@@ -508,23 +512,20 @@ export default function WhatsAppInboxView() {
               )}
             </div>
 
-            {/* Quick Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-0.5 min-w-0 whitespace-nowrap">
-              {(['ALL', 'VENDORS', 'EMPLOYEES', 'LINKED'] as FilterTab[]).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setFilterTab(tab)}
-                  className={`px-2.5 py-0.5 rounded-md text-[10px] transition h-7 flex items-center justify-center shrink-0 font-bold uppercase tracking-wider ${
-                    filterTab === tab
-                      ? 'bg-primary text-primary-foreground shadow-xs'
-                      : 'bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            {/* Shared Tabs Filter Strip */}
+            <Tabs value={filterTab} onValueChange={(val) => setFilterTab(val as FilterTab)} className="w-full">
+              <TabsList className="w-full h-7 grid grid-cols-4 p-0.5 bg-muted/60">
+                {(['ALL', 'VENDORS', 'EMPLOYEES', 'LINKED'] as FilterTab[]).map((tab) => (
+                  <TabsTrigger
+                    key={tab}
+                    value={tab}
+                    className="text-[10px] font-bold uppercase tracking-wider h-6 px-1 py-0 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-xs"
+                  >
+                    {tab}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
 
           {/* Conversation List */}
@@ -712,9 +713,10 @@ export default function WhatsAppInboxView() {
 
                           if (isSystem) {
                             return (
-                              <div key={msg.id} className="flex justify-center my-0.5">
-                                <div className="text-[10px] font-normal leading-[1.3] px-[9px] py-[4px] rounded-full bg-amber-500/10 text-amber-800 dark:text-amber-300 border border-amber-500/20 max-w-[65%] text-center">
-                                  {msg.message}
+                              <div key={msg.id} className="flex justify-center my-1.5">
+                                <div className="flex items-center gap-1.5 text-[10px] font-medium leading-snug px-3 py-1 rounded-lg bg-amber-500/8 text-amber-800 dark:text-amber-300 border border-amber-500/20 max-w-[80%] text-center shadow-2xs">
+                                  <CheckCircle2 className="size-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>{msg.message}</span>
                                 </div>
                               </div>
                             )
@@ -830,31 +832,18 @@ export default function WhatsAppInboxView() {
           className="w-full min-w-0 border-l border-border/40 bg-muted/10 flex flex-col h-full overflow-hidden relative"
           style={{ width: '300px', minWidth: '280px', maxWidth: '320px' }}
         >
-          {/* Tab Header (Grid 2 columns) */}
-          <div className="p-1 border-b border-border/40 bg-card/60 shrink-0 h-9 grid grid-cols-2 gap-1 min-w-0">
-            <button
-              type="button"
-              onClick={() => setRightPanelTab('context')}
-              className={`flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-semibold transition min-w-0 whitespace-nowrap ${
-                rightPanelTab === 'context'
-                  ? 'bg-primary/10 text-primary border border-primary/20 shadow-sm'
-                  : 'text-muted-foreground hover:bg-muted/50'
-              }`}
-            >
-              <Layers className="size-3.5 shrink-0" /> Context
-            </button>
-            <button
-              type="button"
-              onClick={() => setRightPanelTab('assistant')}
-              className={`flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-md text-xs font-semibold transition min-w-0 whitespace-nowrap ${
-                rightPanelTab === 'assistant'
-                  ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 shadow-sm'
-                  : 'text-muted-foreground hover:bg-muted/50'
-              }`}
-            >
-              <Sparkles className="size-3.5 shrink-0" /> AI Assistant
-            </button>
-          </div>
+          {/* Shared Tabs Header for Right Panel */}
+          <Tabs value={rightPanelTab} onValueChange={(val) => setRightPanelTab(val as RightPanelTab)} className="w-full flex flex-col h-full overflow-hidden">
+            <div className="p-1 border-b border-border/40 bg-card/60 shrink-0 h-9">
+              <TabsList className="w-full h-7 grid grid-cols-2 p-0.5 bg-muted/60">
+                <TabsTrigger value="context" className="text-xs font-semibold h-6 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-primary">
+                  <Layers className="size-3.5 shrink-0" /> Context
+                </TabsTrigger>
+                <TabsTrigger value="assistant" className="text-xs font-semibold h-6 gap-1.5 data-[state=active]:bg-background data-[state=active]:text-violet-600">
+                  <Sparkles className="size-3.5 shrink-0" /> AI Assistant
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
           {/* Tab Content */}
           {rightPanelTab === 'context' ? (
@@ -1203,6 +1192,7 @@ export default function WhatsAppInboxView() {
               )}
             </div>
           )}
+          </Tabs>
         </div>
 
       </div>
