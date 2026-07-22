@@ -1169,6 +1169,8 @@ export const api = {
       GET<{ purchaseOrders: any[] }>('/api/reporting/purchase-orders-tracking'),
     sourcingHistory: () =>
       GET<{ sourcingHistory: any[] }>('/api/reporting/sourcing-history'),
+    dailyOperations: (params?: { date?: string }) =>
+      GET<any>('/api/reporting/daily-operations', params),
   },
 
   settings: {
