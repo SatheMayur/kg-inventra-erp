@@ -90,7 +90,7 @@ export default function LoginScreen() {
             <span className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-xl font-bold tracking-tight shadow-lg shadow-primary/15 select-none">KG</span>
             <div className="text-center">
               <p className="text-lg font-semibold tracking-tight">KG<span className="text-primary">_</span>inventra</p>
-              <p className="text-[11px] text-muted-foreground">Inventory ERP · Bangalore</p>
+              <p className="text-[11px] text-muted-foreground">Inventory ERP</p>
             </div>
           </div>
 
