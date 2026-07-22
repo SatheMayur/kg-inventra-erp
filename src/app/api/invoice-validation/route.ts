@@ -47,24 +47,40 @@ export async function POST(request: NextRequest) {
       const ocrText = rawOcrLines.join('\n')
       const ocrHash = createHash('sha256').update(ocrText).digest('hex')
 
-      // Try to extract invoice number using regex from raw OCR lines
+      // Try to extract invoice number, vendor, and date using regex and supplier lookup
       let possibleInvoiceNumber: string | null = null
+      let possibleVendor: string | null = null
+      let possibleDate: string | null = null
+
       const invoiceNoRegex = /\b(?:invoice\s*no|inv\s*no|invoice\s*number|bill\s*no|inv\b)\.?\s*[:#-]?\s*([A-Za-z0-9\/\-]+)\b/i
+      const dateRegex = /\b(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}|\d{4}[\/\.-]\d{1,2}[\/\.-]\d{1,2})\b/
+
       for (const line of rawOcrLines) {
-        const match = line.match(invoiceNoRegex)
-        if (match) {
-          possibleInvoiceNumber = match[1]
+        if (!possibleInvoiceNumber) {
+          const match = line.match(invoiceNoRegex)
+          if (match) possibleInvoiceNumber = match[1]
+        }
+        if (!possibleDate) {
+          const dateMatch = line.match(dateRegex)
+          if (dateMatch) possibleDate = dateMatch[1]
+        }
+      }
+
+      const suppliers = await db.supplier.findMany({ select: { name: true } })
+      const ocrUpper = ocrText.toUpperCase()
+      for (const supp of suppliers) {
+        if (supp.name && supp.name.length >= 3 && ocrUpper.includes(supp.name.toUpperCase())) {
+          possibleVendor = supp.name
           break
         }
       }
-      const possibleVendor = null
-      const possibleDate = null
 
       const existing = await db.invoiceBank.findFirst({
         where: {
-          ocrHash,
-          // TODO: Implement composite backup matching (invoiceNumber + invoiceDate + vendorName)
-          // once possibleDate and possibleVendor extraction are supported by the validation engine.
+          OR: [
+            { ocrHash },
+            ...(possibleInvoiceNumber && possibleVendor ? [{ invoiceNumber: possibleInvoiceNumber, vendorName: possibleVendor }] : []),
+          ],
         },
       })
 

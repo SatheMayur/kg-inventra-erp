@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
-    if (auth.user?.role !== 'admin') {
+    const userRole = auth.user?.role
+    if (userRole !== 'admin' && userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
