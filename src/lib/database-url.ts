@@ -18,36 +18,39 @@ export function resolveDatabaseUrl(rawUrl?: string, options: ResolveDatabaseUrlO
   const allowNonSqlite = options.allowNonSqlite ?? envAllowsNonSqlite()
   const baseDir = options.baseDir ?? process.cwd()
 
-  let targetUrl = dbUrl
-  if (!targetUrl || (!targetUrl.startsWith('file:') && !allowNonSqlite)) {
-    targetUrl = fallbackSqliteUrl
+  if (!dbUrl) {
+    return normalizeFilePath(fallbackSqliteUrl, baseDir)
   }
 
-  if (targetUrl.startsWith('file:')) {
-    const normalized = targetUrl.replace(/\\/g, '/')
-    const filePath = normalized.slice(5)
-    if (path.isAbsolute(filePath)) {
-      return `file:${filePath}`
-    }
-    const cleanRelative = filePath.replace(/^\.\//, '').replace(/^prisma\//, '')
-    const absolutePath = path.resolve(baseDir, 'prisma', cleanRelative).replace(/\\/g, '/')
-    return `file:${absolutePath}`
+  if (dbUrl.startsWith('file:')) {
+    return normalizeFilePath(dbUrl, baseDir)
   }
 
   if (allowNonSqlite) {
-    return targetUrl
+    return dbUrl
   }
 
-  if (nodeEnv !== 'production') {
-    return fallbackSqliteUrl
+  if (nodeEnv === 'production') {
+    throw new Error(
+      [
+        'Invalid DATABASE_URL for the current Prisma schema.',
+        'This application is currently configured with a SQLite datasource, so DATABASE_URL must start with "file:".',
+        'Set ALLOW_NON_SQLITE_DATABASE_URL=true only after the Prisma datasource provider has been migrated intentionally.',
+      ].join(' '),
+    )
   }
 
-  throw new Error(
-    [
-      'Invalid DATABASE_URL for the current Prisma schema.',
-      'This application is currently configured with a SQLite datasource, so DATABASE_URL must start with "file:".',
-      'Set ALLOW_NON_SQLITE_DATABASE_URL=true only after the Prisma datasource provider has been migrated intentionally.',
-    ].join(' '),
-  )
+  return normalizeFilePath(fallbackSqliteUrl, baseDir)
+}
+
+function normalizeFilePath(targetUrl: string, baseDir: string) {
+  const normalized = targetUrl.replace(/\\/g, '/')
+  const filePath = normalized.slice(5)
+  if (path.isAbsolute(filePath)) {
+    return `file:${filePath}`
+  }
+  const cleanRelative = filePath.replace(/^\.\//, '').replace(/^prisma\//, '')
+  const absolutePath = path.resolve(baseDir, 'prisma', cleanRelative).replace(/\\/g, '/')
+  return `file:${absolutePath}`
 }
 
