@@ -60,7 +60,22 @@ type DraftLine = { key: string; itemId: string; qty: string; qualityGrade: strin
 type ReceiptLine = { itemId: string; qty: string; grossWeight: string; containerWeight: string; rejectedQty: string; qualityResult: string; rejectionReason: string }
 
 const OPEN_CONVERSATION = new Set(['DRAFT', 'SENT_TO_VENDOR', 'AWAITING_VENDOR_REPLY', 'REPLY_RECEIVED', 'NEEDS_REVIEW', 'PARTIALLY_CONFIRMED', 'CONFIRMED', 'SHORTAGE', 'ALTERNATE_VENDOR_REQUIRED', 'READY_FOR_RECEIVING'])
-const newLine = (): DraftLine => ({ key: crypto.randomUUID(), itemId: '', qty: '', qualityGrade: '', notes: '' })
+const createDraftKey = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = crypto.getRandomValues(new Uint8Array(16))
+    bytes[6] = (bytes[6] & 0x0f) | 0x40
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+}
+const newLine = (): DraftLine => ({ key: createDraftKey(), itemId: '', qty: '', qualityGrade: '', notes: '' })
 const inputDate = (date: Date) => format(date, 'yyyy-MM-dd')
 
 const TRANSLITERATION_MAP: Record<string, string[]> = {
@@ -267,7 +282,7 @@ export default function ConversationDrivenDailyProcurement({ items, suppliers, l
     } else {
       setDraftLines((rows) => {
         const cleanRows = rows.filter((r) => r.itemId !== '')
-        return [...cleanRows, { key: crypto.randomUUID(), itemId, qty: '1', qualityGrade: '', notes: '' }]
+        return [...cleanRows, { key: createDraftKey(), itemId, qty: '1', qualityGrade: '', notes: '' }]
       })
       toast.success(`Added ${item.name} (${item.unit})`)
       focusQuantityInput(itemId)
@@ -344,7 +359,7 @@ export default function ConversationDrivenDailyProcurement({ items, suppliers, l
     if (!copy) return toast.error('No previous requirement is available')
     setRequirementDate(inputDate(new Date())); setDeliveryDate(inputDate(new Date())); setDeliveryTime(copy.deliveryTimeSlot || '08:00')
     setLocation(copy.deliveryLocation || 'Main Store'); setDepartment(copy.departmentName || 'Kitchen'); setRequirementNotes(copy.notes || '')
-    setDraftLines(copy.lines.map((line) => ({ key: crypto.randomUUID(), itemId: line.itemId, qty: String(line.operationalRequirement), qualityGrade: line.qualityGrade || '', notes: line.notes || '' })))
+    setDraftLines(copy.lines.map((line) => ({ key: createDraftKey(), itemId: line.itemId, qty: String(line.operationalRequirement), qualityGrade: line.qualityGrade || '', notes: line.notes || '' })))
     setCreateOpen(true)
   }
   const createRequirement = async () => {
