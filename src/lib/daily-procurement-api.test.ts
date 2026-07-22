@@ -180,7 +180,7 @@ async function seedFixtures() {
   })
 }
 
-async function tokenFor(user: typeof users[keyof typeof users]) {
+async function tokenFor(user: { id: string; empId: string; name: string; department: string; role: string }) {
   return generateToken({
     id: user.id,
     empId: user.empId,
@@ -190,7 +190,7 @@ async function tokenFor(user: typeof users[keyof typeof users]) {
   })
 }
 
-async function makeRequest(path: string, method: string, body: unknown, user = users.creator) {
+async function makeRequest(path: string, method: string, body: unknown, user: { id: string; empId: string; name: string; department: string; role: string } = users.creator) {
   const token = await tokenFor(user)
   return new NextRequest(`http://localhost${path}`, {
     method,
@@ -202,7 +202,7 @@ async function makeRequest(path: string, method: string, body: unknown, user = u
   })
 }
 
-async function createBatch(body: unknown, user = users.creator) {
+async function createBatch(body: unknown, user: { id: string; empId: string; name: string; department: string; role: string } = users.creator) {
   return createDailyBatch(await makeRequest('/api/daily-procurement', 'POST', body, user))
 }
 

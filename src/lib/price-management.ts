@@ -8,6 +8,42 @@ export interface TrendResult {
   deltaAmount: number | null
 }
 
+export interface ItemPriceSummary {
+  itemId: string
+  itemName: string
+  category: string
+  unit: string
+  firstRate: number
+  lastRate: number
+  minRate: number
+  maxRate: number
+  minGrossRate: number
+  maxGrossRate: number
+  simpleAvgRate: number
+  simpleAvgGrossRate: number
+  weightedAvgRate: number
+  weightedAvgGrossRate: number
+  totalQty: number
+  totalSpendBase: number
+  totalSpendGross: number
+  purchaseCount: number
+  supplierCount: number
+  trend: TrendType
+  deltaPercentage: number | null
+  deltaAmount: number | null
+}
+
+export interface CategorySpendingReport {
+  category: string
+  itemsCount: number
+  totalQty: number
+  totalSpend: number
+  percentOfBudget: number
+  topItemName: string
+  topItemSpend: number
+  avgRate: number
+}
+
 export function calculateSimpleAverageRate(rates: number[]): number {
   const validRates = rates.filter((r) => typeof r === 'number' && !isNaN(r) && r > 0)
   if (!validRates.length) return 0
@@ -123,7 +159,7 @@ export async function getItemPriceSummaries(monthStr?: string, categoryFilter?: 
     itemMap.get(key)!.push(t)
   })
 
-  const summaries = []
+  const summaries: ItemPriceSummary[] = []
 
   for (const [itemId, itemTxList] of itemMap.entries()) {
     const firstTx = itemTxList[0]
@@ -200,7 +236,7 @@ export async function getCategorySpendingSummary(monthStr?: string) {
     cat.items.push(s)
   }
 
-  const categoryReports = []
+  const categoryReports: CategorySpendingReport[] = []
   for (const [categoryName, data] of catMap.entries()) {
     const percentOfBudget = grandTotalSpend > 0 ? Number(((data.totalSpend / grandTotalSpend) * 100).toFixed(1)) : 0
     const topItem = data.items.sort((a, b) => b.totalSpendGross - a.totalSpendGross)[0]

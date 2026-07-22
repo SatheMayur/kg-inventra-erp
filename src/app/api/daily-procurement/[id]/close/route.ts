@@ -43,10 +43,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           data: {
             status: 'RECEIVED',
             completedAt: null,
-            closedAt: null,
-            closedById: null,
             reopenedAt: new Date(),
-            reopenedById: user.id,
+            reopenedBy: user.name || user.empId || user.id,
             reopenReason: payload.reason,
             version: { increment: 1 },
           },
@@ -68,8 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           status: 'CLOSED',
           completedAt: new Date(),
-          closedAt: new Date(),
-          closedById: user.id,
+          closedBy: user.name || user.empId || user.id,
           version: { increment: 1 },
         },
       })

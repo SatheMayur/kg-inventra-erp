@@ -148,6 +148,8 @@ export function QuickAddDailyItemModal({
         name: trimmedName,
         category,
         unit,
+        stock: 0,
+        minStock: 0,
         shortName: shortName.trim() || undefined,
         sourceChannel: 'DAILY_PROCUREMENT_QUICK_ADD',
         itemNature: perishable ? 'PERISHABLE' : 'NON_PERISHABLE',

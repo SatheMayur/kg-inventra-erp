@@ -84,8 +84,8 @@ export async function POST(request: NextRequest) {
         notes: notes ? String(notes).trim() : null,
         sourceType: 'MANUAL_ENTRY',
         originalItemText: item.name,
-        createdById: auth.user.id,
-        createdBy: auth.user.name,
+        createdById: user.id,
+        createdBy: user.name,
       },
       include: {
         item: { select: { id: true, name: true, category: true, unit: true } },
@@ -95,13 +95,12 @@ export async function POST(request: NextRequest) {
 
     await db.auditLog.create({
       data: {
-        actorId: auth.user.id,
-        actorName: auth.user.name,
-        actorRole: auth.user.role,
+        userId: user.id,
+        userName: user.name,
         action: 'CREATE_PRICE_TRANSACTION',
-        targetType: 'PriceTransaction',
         targetId: transaction.id,
-        details: JSON.stringify({ itemId: item.id, itemName: item.name, rate: numRate, quantity: numQty, grossAmount }),
+        targetName: item.name,
+        metadata: JSON.stringify({ itemId: item.id, itemName: item.name, rate: numRate, quantity: numQty, grossAmount }),
       },
     })
 
