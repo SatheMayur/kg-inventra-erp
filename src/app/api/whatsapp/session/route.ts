@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { authorize } from '@/lib/auth'
 import { handleApiError } from '@/lib/api-utils'
 import QRCode from 'qrcode'
+import { emitWhatsAppSessionChanged } from '@/lib/realtime'
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,8 +129,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
-    const userRole = auth.user?.role
-    if (userRole !== 'admin' && userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
+    const userRole = String(auth.user?.role || '').toUpperCase()
+    if (userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -151,6 +152,12 @@ export async function POST(request: NextRequest) {
           qrCode: null,
           updatedAt: new Date()
         }
+      })
+
+      emitWhatsAppSessionChanged({
+        status: 'STARTING',
+        qrAvailable: false,
+        reason: 'relink-requested',
       })
 
       return NextResponse.json({ success: true, status: 'STARTING', message: 'Relink command issued successfully' })

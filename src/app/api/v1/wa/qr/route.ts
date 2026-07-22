@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { handleApiError, validateBridgeKey } from '@/lib/api-utils';
+import { emitWhatsAppSessionChanged } from '@/lib/realtime';
 
 export async function POST(request: Request) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { qr, status } = body;
 
-    await db.whatsAppSession.upsert({
+    const session = await db.whatsAppSession.upsert({
       where: { id: 'default' },
       create: {
         id: 'default',
@@ -20,6 +21,12 @@ export async function POST(request: Request) {
         qrCode: qr || null,
         reconnects: status === 'CONNECTED' ? { increment: 1 } : undefined,
       },
+    });
+
+    emitWhatsAppSessionChanged({
+      status: session.status,
+      qrAvailable: Boolean(session.qrCode),
+      reason: 'updated',
     });
 
     return NextResponse.json({ success: true });
