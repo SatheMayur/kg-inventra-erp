@@ -1,39 +1,26 @@
-import path from 'path'
 import { describe, expect, it } from 'vitest'
 import { resolveDatabaseUrl } from './database-url'
 
-const expectedDbUrl = `file:${path.resolve('/app', 'prisma', 'dev.db').replace(/\\/g, '/')}`
-
 describe('resolveDatabaseUrl', () => {
-  it('uses the local SQLite database when DATABASE_URL is empty', () => {
-    expect(resolveDatabaseUrl(undefined, { nodeEnv: 'production', baseDir: '/app' })).toBe(expectedDbUrl)
-    expect(resolveDatabaseUrl('', { nodeEnv: 'production', baseDir: '/app' })).toBe(expectedDbUrl)
+  it('requires DATABASE_URL', () => {
+    expect(() => resolveDatabaseUrl(undefined)).toThrow(/Missing DATABASE_URL/)
+    expect(() => resolveDatabaseUrl('')).toThrow(/Missing DATABASE_URL/)
   })
 
-  it('normalizes SQLite file URLs for Windows paths', () => {
-    expect(resolveDatabaseUrl('file:.\\prisma\\dev.db', { nodeEnv: 'production', baseDir: '/app' })).toBe(
-      expectedDbUrl,
-    )
+  it('accepts PostgreSQL URLs', () => {
+    expect(resolveDatabaseUrl('postgresql://example.invalid/store')).toBe('postgresql://example.invalid/store')
+    expect(resolveDatabaseUrl('postgres://example.invalid/store')).toBe('postgres://example.invalid/store')
   })
 
-  it('falls back to SQLite for accidental non-file URLs outside production', () => {
-    expect(resolveDatabaseUrl('postgresql://example.invalid/store', { nodeEnv: 'development', baseDir: '/app' })).toBe(
-      expectedDbUrl,
-    )
+  it('rejects SQLite file URLs by default', () => {
+    expect(() => resolveDatabaseUrl('file:./prisma/dev.db')).toThrow(/PostgreSQL datasource/)
   })
 
-  it('fails fast for incompatible production database providers', () => {
-    expect(() =>
-      resolveDatabaseUrl('postgresql://example.invalid/store', { nodeEnv: 'production' }),
-    ).toThrow(/configured with a SQLite datasource/)
+  it('allows SQLite only with an explicit compatibility override', () => {
+    expect(resolveDatabaseUrl('file:./prisma/dev.db', { allowSqlite: true })).toBe('file:./prisma/dev.db')
   })
 
-  it('allows an explicit non-SQLite override for intentional future migrations', () => {
-    expect(
-      resolveDatabaseUrl('postgresql://example.invalid/store', {
-        nodeEnv: 'production',
-        allowNonSqlite: true,
-      }),
-    ).toBe('postgresql://example.invalid/store')
+  it('rejects unsupported database providers', () => {
+    expect(() => resolveDatabaseUrl('mysql://example.invalid/store')).toThrow(/PostgreSQL datasource/)
   })
 })

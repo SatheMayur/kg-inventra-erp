@@ -1,19 +1,21 @@
 import { execFileSync } from 'node:child_process'
-import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const absoluteTestDbPath = path.resolve(__dirname, 'prisma', 'test.db').replace(/\\/g, '/')
 
 export function setup() {
-  const databaseUrl = `file:${absoluteTestDbPath}`
-  const prismaCli = path.join(__dirname, 'node_modules', 'prisma', 'build', 'index.js')
-
-  for (const suffix of ['', '-shm', '-wal']) {
-    rmSync(`${absoluteTestDbPath}${suffix}`, { force: true })
+  const databaseUrl = process.env.TEST_DATABASE_URL
+  if (!databaseUrl) {
+    return
   }
+
+  if (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://')) {
+    throw new Error('TEST_DATABASE_URL must be a PostgreSQL URL.')
+  }
+
+  const prismaCli = path.join(__dirname, 'node_modules', 'prisma', 'build', 'index.js')
 
   execFileSync(
     process.execPath,

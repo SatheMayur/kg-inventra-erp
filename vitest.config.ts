@@ -1,14 +1,12 @@
 import { defineConfig } from 'vitest/config'
 import path from 'path'
 
-const absoluteTestDbPath = path.resolve(__dirname, 'prisma', 'test.db').replace(/\\/g, '/')
-
 export default defineConfig({
   test: {
     environment: 'node',
     globalSetup: './vitest.global-setup.ts',
     env: {
-      DATABASE_URL: `file:${absoluteTestDbPath}`
+      DATABASE_URL: process.env.TEST_DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:65432/kg_inventra_test',
     },
     include: ['src/**/*.test.ts'],
     sequence: {
