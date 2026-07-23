@@ -1,0 +1,37 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, kg-inventra]
+    steps:
+      - name: Checkout
+        run: |
+          rm -rf checkout
+          git clone --depth 1 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git checkout
+      - name: Build and deploy
+        working-directory: checkout
+        run: |
+          mkdir -p /data/server/services/kg-inventra/whatsapp-auth
+          docker build --network host -t kg-inventra:latest .
+          docker rm -f kg-inventra 2>/dev/null || true
+          docker run -d --name kg-inventra --network proxy \
+            --env-file /data/server/services/kg-inventra/.env \
+            -e PORT=3084 \
+            -e APP_COMMIT_SHA=${{ github.sha }} \
+            -e APP_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -v /data/server/services/kg-inventra/whatsapp-auth:/app/data/whatsapp-auth \
+            --memory-reservation=256m --memory=1536m --cpu-shares=1024 \
+            --restart unless-stopped kg-inventra:latest
+          for i in $(seq 1 30); do
+            if docker exec kg-inventra node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '3084') + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"; then
+              docker exec kg-inventra node -e "fetch('http://127.0.0.1:' + (process.env.PORT || '3084') + '/api/health').then(r => r.text()).then(console.log)"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs --tail=120 kg-inventra
+          exit 1
