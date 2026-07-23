@@ -128,13 +128,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
-<<<<<<< Updated upstream
     const userRole = String(auth.user?.role ?? '').toUpperCase()
     if (userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
-=======
-    const userRole = String(auth.user?.role ?? '')
-    if (!['admin', 'ADMIN', 'STORE_ADMIN'].includes(userRole)) {
->>>>>>> Stashed changes
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

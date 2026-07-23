@@ -334,61 +334,11 @@ export default function ReportingView() {
 
   const handleExportDailyOperations = () => {
     if (!dailyOps) {
-<<<<<<< Updated upstream
-<<<<<<< HEAD
-      toast.error('Daily operations report is not loaded')
-=======
       toast.error('No daily operations data to export')
->>>>>>> origin/main
-=======
-      toast.error('No daily operations data to export')
->>>>>>> Stashed changes
       return
     }
 
     const rows = [
-<<<<<<< Updated upstream
-<<<<<<< HEAD
-      ...dailyOps.urgentActions.map((row) => ({
-=======
-      ...((dailyOps.urgentActions ?? []).map((item: any) => ({
->>>>>>> Stashed changes
-        section: 'Urgent Action',
-        reference: item.area,
-        name: item.title,
-        status: item.severity,
-        quantity: '',
-        detail: item.detail,
-      }))),
-      ...((dailyOps.stockRiskItems ?? []).map((item: any) => ({
-        section: 'Stock Risk',
-        reference: item.category,
-        name: item.name,
-        status: item.severity,
-        quantity: `${item.available} ${item.unit}`,
-        detail: `Min ${item.minStock}; shortage ${item.shortageQty}`,
-      }))),
-      ...((dailyOps.pendingRequests ?? []).map((item: any) => ({
-        section: 'Pending Request',
-        reference: item.requestNumber,
-        name: item.employee,
-        status: item.status,
-        quantity: `${item.issuedQty}/${item.requestedQty}`,
-        detail: `${item.department}; ${item.ageInDays} day(s) old`,
-      }))),
-      ...((dailyOps.purchaseOrders ?? []).map((item: any) => ({
-        section: 'Purchase Order',
-        reference: item.poNumber,
-        name: item.supplierName,
-        status: item.status,
-        quantity: `${item.receivedQty}/${item.orderedQty}`,
-        detail: `${item.overdue ? 'Overdue' : 'Open'}; ${item.ageInDays} day(s) old`,
-      }))),
-    ]
-
-<<<<<<< Updated upstream
-    exportToCSV(rows, ['section', 'name', 'status', 'metric', 'detail'], `daily_operations_${dailyOps.reportDate}`)
-=======
       ...((dailyOps.urgentActions ?? []).map((item: any) => ({
         section: 'Urgent Action',
         reference: item.area,
@@ -424,10 +374,6 @@ export default function ReportingView() {
     ]
 
     exportToCSV(rows, ['section', 'reference', 'name', 'status', 'quantity', 'detail'], 'daily_operations_report')
->>>>>>> origin/main
-=======
-    exportToCSV(rows, ['section', 'reference', 'name', 'status', 'quantity', 'detail'], 'daily_operations_report')
->>>>>>> Stashed changes
   }
 
   const formatCurrency = (val: number) => 
