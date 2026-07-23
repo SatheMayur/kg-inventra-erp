@@ -1,5 +1,4 @@
 import { db } from './db';
-import { emitNotificationCreated } from './realtime';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
@@ -17,7 +16,7 @@ export async function createNotification({
   link?: string;
 }) {
   try {
-    const notification = await db.notification.create({
+    return await db.notification.create({
       data: {
         userId,
         title,
@@ -26,8 +25,6 @@ export async function createNotification({
         link,
       },
     });
-    emitNotificationCreated(notification);
-    return notification;
   } catch (error) {
     console.error('[NotificationService] Failed to create notification:', error);
   }

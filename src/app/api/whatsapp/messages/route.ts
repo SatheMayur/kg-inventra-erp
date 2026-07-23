@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { authorize } from '@/lib/auth';
 import { handleApiError } from '@/lib/api-utils';
-import { emitWhatsAppMessageChanged } from '@/lib/realtime';
 
 export async function GET(request: NextRequest) {
   try {
@@ -225,14 +224,6 @@ export async function POST(request: NextRequest) {
         status: 'PENDING',
         senderName
       }
-    });
-
-    emitWhatsAppMessageChanged({
-      phone: newMessage.phone,
-      messageId: newMessage.id,
-      direction: newMessage.direction,
-      status: newMessage.status,
-      reason: 'created',
     });
 
     return NextResponse.json(newMessage, { status: 201 });

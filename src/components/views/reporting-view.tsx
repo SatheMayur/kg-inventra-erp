@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   Clock,
   Check,
-  CheckCircle2,
   DollarSign,
   Users,
   ArrowLeftRight,
@@ -18,7 +17,6 @@ import {
   History,
   Calendar,
   FileText,
-  RefreshCw,
 } from 'lucide-react'
 import {
   BarChart,
@@ -79,19 +77,6 @@ const PERIODS = [
 
 type PeriodKey = (typeof PERIODS)[number]['key']
 
-type DailyOperationsReport = {
-  reportDate: string
-  generatedAt: string
-  summary: Record<string, number>
-  urgentActions: Array<{ severity: string; area: string; title: string; detail: string }>
-  stockRiskItems: Array<{ id: string; name: string; category: string; unit: string; available: number; minStock: number; shortageQty: number; severity: string }>
-  pendingRequests: Array<{ id: string; requestNumber: string; employee: string; department: string; status: string; priority: string; requestedQty: number; issuedQty: number; ageInDays: number }>
-  purchaseOrders: Array<{ id: string; poNumber: string; supplierName: string; status: string; totalAmount: number; expectedDeliveryDate?: string | null; pendingQty: number; ageInDays: number; overdue: boolean }>
-  dailyProcurement: Array<{ id: string; batchNumber: string; status: string; deliveryDate: string; deliveryTimeSlot?: string | null; departmentName?: string | null; finalPurchaseQty: number; openLines: number; activeConversations: number; unreadVendorMessages: number }>
-  whatsappFailures: Array<{ id: string; phone: string; messageType: string; error?: string | null; updatedAt: string }>
-  topConsumedItems: Array<{ itemId: string; itemName: string; qty: number; transactions: number }>
-}
-
 export default function ReportingView() {
   const flags = useAppStore((s) => s.flags)
   const [period, setPeriod] = useState<PeriodKey>('30d')
@@ -101,8 +86,6 @@ export default function ReportingView() {
   const [stockoutRisk, setStockoutRisk] = useState<StockoutRiskItem[]>([])
   const [periodComp, setPeriodComp] = useState<PeriodComparison | null>(null)
   const [loading, setLoading] = useState(true)
-  const [dailyOps, setDailyOps] = useState<DailyOperationsReport | null>(null)
-  const [dailyOpsLoading, setDailyOpsLoading] = useState(false)
 
   // New tab states
   const [invValue, setInvValue] = useState<InventoryValueResponse | null>(null)
@@ -173,22 +156,6 @@ export default function ReportingView() {
       fetchData()
     }
   }, [fetchData, reportingEnabled])
-
-  const fetchDailyOperations = useCallback(async () => {
-    try {
-      setDailyOpsLoading(true)
-      const data = await api.reporting.dailyOperations()
-      setDailyOps(data)
-    } catch {
-      toast.error('Failed to load daily operations report')
-    } finally {
-      setDailyOpsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (reportingEnabled) fetchDailyOperations()
-  }, [fetchDailyOperations, reportingEnabled])
 
   const fetchInvValue = useCallback(async () => {
     try {
@@ -367,53 +334,59 @@ export default function ReportingView() {
 
   const handleExportDailyOperations = () => {
     if (!dailyOps) {
+<<<<<<< Updated upstream
 <<<<<<< HEAD
       toast.error('Daily operations report is not loaded')
 =======
       toast.error('No daily operations data to export')
 >>>>>>> origin/main
+=======
+      toast.error('No daily operations data to export')
+>>>>>>> Stashed changes
       return
     }
 
     const rows = [
+<<<<<<< Updated upstream
 <<<<<<< HEAD
       ...dailyOps.urgentActions.map((row) => ({
+=======
+      ...((dailyOps.urgentActions ?? []).map((item: any) => ({
+>>>>>>> Stashed changes
         section: 'Urgent Action',
-        name: row.title,
-        status: row.severity,
-        metric: row.area,
-        detail: row.detail,
-      })),
-      ...dailyOps.stockRiskItems.map((row) => ({
+        reference: item.area,
+        name: item.title,
+        status: item.severity,
+        quantity: '',
+        detail: item.detail,
+      }))),
+      ...((dailyOps.stockRiskItems ?? []).map((item: any) => ({
         section: 'Stock Risk',
-        name: row.name,
-        status: row.severity,
-        metric: `${row.available} ${row.unit} available`,
-        detail: `${row.shortageQty} ${row.unit} below minimum stock`,
-      })),
-      ...dailyOps.pendingRequests.map((row) => ({
-        section: 'Pending Requisition',
-        name: row.requestNumber,
-        status: row.status,
-        metric: `${row.ageInDays} days`,
-        detail: `${row.employee} / ${row.department} / ${row.requestedQty - row.issuedQty} pending qty`,
-      })),
-      ...dailyOps.purchaseOrders.map((row) => ({
+        reference: item.category,
+        name: item.name,
+        status: item.severity,
+        quantity: `${item.available} ${item.unit}`,
+        detail: `Min ${item.minStock}; shortage ${item.shortageQty}`,
+      }))),
+      ...((dailyOps.pendingRequests ?? []).map((item: any) => ({
+        section: 'Pending Request',
+        reference: item.requestNumber,
+        name: item.employee,
+        status: item.status,
+        quantity: `${item.issuedQty}/${item.requestedQty}`,
+        detail: `${item.department}; ${item.ageInDays} day(s) old`,
+      }))),
+      ...((dailyOps.purchaseOrders ?? []).map((item: any) => ({
         section: 'Purchase Order',
-        name: row.poNumber,
-        status: row.status,
-        metric: row.overdue ? 'Overdue' : `${row.ageInDays} days`,
-        detail: `${row.supplierName} / pending qty ${row.pendingQty} / value ${row.totalAmount}`,
-      })),
-      ...dailyOps.topConsumedItems.map((row) => ({
-        section: 'Top Consumption',
-        name: row.itemName,
-        status: 'OUT',
-        metric: `${row.qty}`,
-        detail: `${row.transactions} transaction(s) today`,
-      })),
+        reference: item.poNumber,
+        name: item.supplierName,
+        status: item.status,
+        quantity: `${item.receivedQty}/${item.orderedQty}`,
+        detail: `${item.overdue ? 'Overdue' : 'Open'}; ${item.ageInDays} day(s) old`,
+      }))),
     ]
 
+<<<<<<< Updated upstream
     exportToCSV(rows, ['section', 'name', 'status', 'metric', 'detail'], `daily_operations_${dailyOps.reportDate}`)
 =======
       ...((dailyOps.urgentActions ?? []).map((item: any) => ({
@@ -452,6 +425,9 @@ export default function ReportingView() {
 
     exportToCSV(rows, ['section', 'reference', 'name', 'status', 'quantity', 'detail'], 'daily_operations_report')
 >>>>>>> origin/main
+=======
+    exportToCSV(rows, ['section', 'reference', 'name', 'status', 'quantity', 'detail'], 'daily_operations_report')
+>>>>>>> Stashed changes
   }
 
   const formatCurrency = (val: number) => 
@@ -542,10 +518,6 @@ export default function ReportingView() {
             <BarChart3 className="size-3.5 mr-1.5" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="daily-operations" onClick={fetchDailyOperations}>
-            <FileText className="size-3.5 mr-1.5" />
-            Daily Ops
-          </TabsTrigger>
           <TabsTrigger value="inventory-value" onClick={() => { if (!invValueLoaded) fetchInvValue() }}>
             <DollarSign className="size-3.5 mr-1.5" />
             Inventory Value
@@ -584,199 +556,7 @@ export default function ReportingView() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Daily Operations tab */}
-        <TabsContent value="daily-operations" className="space-y-4">
-          <Card className="border-border bg-card">
-            <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3 space-y-0">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="size-4 text-primary" />
-                  Daily Operations Report
-                </CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  One-page summary for stock risk, requisitions, purchase orders, daily procurement, and WhatsApp queue health.
-                </p>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={fetchDailyOperations} disabled={dailyOpsLoading} className="gap-1.5">
-                  <RefreshCw className={`size-3.5 ${dailyOpsLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleExportDailyOperations} disabled={!dailyOps || dailyOpsLoading} className="gap-1.5">
-                  <FileDown className="size-3.5" />
-                  Export CSV
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {dailyOpsLoading && !dailyOps ? (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                  {Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-24 w-full" />)}
-                </div>
-              ) : !dailyOps ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <FileText className="mb-2 size-8 opacity-30" />
-                  <p className="text-sm">Daily operations report is not loaded.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/50 bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
-                    <span>Report date: <span className="font-semibold text-foreground">{dailyOps.reportDate}</span></span>
-                    <span>Generated: <span className="font-semibold text-foreground">{new Date(dailyOps.generatedAt).toLocaleString()}</span></span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-                    {[
-                      ['Stock Risk', dailyOps.summary.stockRiskCount, 'items need attention'],
-                      ['Out of Stock', dailyOps.summary.outOfStockCount, 'critical stockouts'],
-                      ['Pending SR', dailyOps.summary.pendingRequests, 'open requisitions'],
-                      ['Open PO', dailyOps.summary.openPurchaseOrders, 'purchase orders'],
-                      ['Overdue PO', dailyOps.summary.overduePurchaseOrders, 'supplier follow-up'],
-                      ['Vendor Replies', dailyOps.summary.pendingVendorReplies, 'pending/review'],
-                      ['GRN Today', dailyOps.summary.goodsReceiptsToday, 'receipts posted'],
-                      ['WA Failed', dailyOps.summary.whatsappFailed, 'message failures'],
-                    ].map(([label, value, hint]) => (
-                      <div key={label} className="rounded-xl border border-border/50 bg-background/60 p-3">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
-                        <p className="mt-1 text-2xl font-extrabold text-foreground">{value}</p>
-                        <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                    <Card className="border-border/60 bg-muted/5">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <AlertTriangle className="size-4 text-amber-500" />
-                          Urgent Actions
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {dailyOps.urgentActions.length === 0 ? (
-                          <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-3 text-sm text-emerald-600">
-                            <CheckCircle2 className="size-4" />
-                            No urgent blockers detected.
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {dailyOps.urgentActions.map((action, index) => (
-                              <div key={`${action.area}-${index}`} className="rounded-lg border border-border/50 bg-background/70 p-3">
-                                <Badge className={action.severity === 'critical' ? 'bg-rose-500/15 text-rose-600 border-rose-500/30' : 'bg-amber-500/15 text-amber-600 border-amber-500/30'}>
-                                  {action.area}
-                                </Badge>
-                                <p className="mt-2 text-sm font-semibold">{action.title}</p>
-                                <p className="mt-1 text-xs text-muted-foreground">{action.detail}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/60 bg-muted/5 xl:col-span-2">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Top Stock Risk</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {dailyOps.stockRiskItems.length === 0 ? (
-                          <p className="py-6 text-center text-sm text-muted-foreground">No stock risk items found.</p>
-                        ) : (
-                          <div className="overflow-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="border-b border-border/50 text-left text-xs text-muted-foreground">
-                                  <th className="pb-2 pr-4 font-medium">Item</th>
-                                  <th className="pb-2 pr-4 font-medium">Category</th>
-                                  <th className="pb-2 pr-4 font-medium text-right">Available</th>
-                                  <th className="pb-2 pr-4 font-medium text-right">Min</th>
-                                  <th className="pb-2 font-medium">Risk</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {dailyOps.stockRiskItems.slice(0, 8).map((item) => (
-                                  <tr key={item.id} className="border-b border-border/20 last:border-0">
-                                    <td className="py-2.5 pr-4 font-semibold">{item.name}</td>
-                                    <td className="py-2.5 pr-4 text-muted-foreground">{item.category}</td>
-                                    <td className="py-2.5 pr-4 text-right">{item.available} {item.unit}</td>
-                                    <td className="py-2.5 pr-4 text-right">{item.minStock} {item.unit}</td>
-                                    <td className="py-2.5">
-                                      <Badge className={item.severity === 'critical' ? 'bg-rose-500/15 text-rose-600 border-rose-500/30' : 'bg-amber-500/15 text-amber-600 border-amber-500/30'}>
-                                        {item.severity}
-                                      </Badge>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <Card className="border-border/60 bg-muted/5">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Pending Requisitions</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {dailyOps.pendingRequests.length === 0 ? (
-                          <p className="py-6 text-center text-sm text-muted-foreground">No pending requisitions.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {dailyOps.pendingRequests.slice(0, 6).map((request) => (
-                              <div key={request.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/70 p-3">
-                                <div>
-                                  <p className="text-sm font-semibold">{request.requestNumber}</p>
-                                  <p className="text-xs text-muted-foreground">{request.employee} / {request.department}</p>
-                                </div>
-                                <div className="text-right">
-                                  <Badge variant="outline" className="text-[10px]">{request.status}</Badge>
-                                  <p className="mt-1 text-[10px] text-muted-foreground">{request.ageInDays} day(s) old</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/60 bg-muted/5">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">PO & Supplier Follow-up</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {dailyOps.purchaseOrders.length === 0 ? (
-                          <p className="py-6 text-center text-sm text-muted-foreground">No open purchase orders.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {dailyOps.purchaseOrders.slice(0, 6).map((po) => (
-                              <div key={po.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/70 p-3">
-                                <div>
-                                  <p className="text-sm font-semibold">{po.poNumber}</p>
-                                  <p className="text-xs text-muted-foreground">{po.supplierName} / pending {po.pendingQty}</p>
-                                </div>
-                                <div className="text-right">
-                                  <Badge className={po.overdue ? 'bg-rose-500/15 text-rose-600 border-rose-500/30' : 'bg-sky-500/15 text-sky-600 border-sky-500/30'}>
-                                    {po.overdue ? 'Overdue' : po.status}
-                                  </Badge>
-                                  <p className="mt-1 text-[10px] text-muted-foreground">{formatCurrency(po.totalAmount)}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Overview tab */}
+        {/* ── Overview tab (existing content, unchanged) ── */}
         <TabsContent value="overview" className="space-y-4">
           {/* Period Selector */}
           <div className="flex flex-wrap gap-2">

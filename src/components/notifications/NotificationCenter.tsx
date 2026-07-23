@@ -14,7 +14,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { api, NotificationResponse } from '@/lib/api'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
-import { getRealtimeSocket } from '@/lib/socket-client'
 
 export function NotificationCenter() {
   const [notifications, setNotifications] = useState<NotificationResponse[]>([])
@@ -42,35 +41,6 @@ export function NotificationCenter() {
   useEffect(() => {
     if (open) fetchNotifications()
   }, [open, fetchNotifications])
-
-  useEffect(() => {
-    if (!user) return
-
-    const socket = getRealtimeSocket()
-    if (!socket) return
-
-    const joinUserRoom = () => {
-      socket.emit('join:user', user.id)
-    }
-
-    const handleNotification = (notification: NotificationResponse) => {
-      if (notification.userId !== user.id) return
-      setNotifications((prev) => {
-        if (prev.some((n) => n.id === notification.id)) return prev
-        return [notification, ...prev].slice(0, 50)
-      })
-    }
-
-    socket.on('connect', joinUserRoom)
-    socket.on('notification:new', handleNotification)
-
-    if (socket.connected) joinUserRoom()
-
-    return () => {
-      socket.off('connect', joinUserRoom)
-      socket.off('notification:new', handleNotification)
-    }
-  }, [user, fetchNotifications])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

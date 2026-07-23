@@ -10,12 +10,8 @@ import crypto from 'crypto';
 import { handleApiError, validateBridgeKey } from '@/lib/api-utils';
 import { normalizeWhatsAppPhone } from '@/lib/daily-procurement';
 import { DAILY_CONVERSATION_STATUS, parseVendorSupplyReply } from '@/lib/daily-conversations';
-import { emitWhatsAppMessageChanged } from '@/lib/realtime';
 
 export async function POST(req: NextRequest) {
-  let realtimePhone: string | null = null;
-  let shouldEmitWhatsAppRefresh = false;
-
   try {
     validateBridgeKey(req);
     const body = await req.json();
@@ -28,7 +24,6 @@ export async function POST(req: NextRequest) {
     const remoteJid = msg.key.remoteJid;
     // Extract raw digits for matching in database
     const cleanPhone = remoteJid.split('@')[0].replace(/\D/g, '');
-    realtimePhone = normalizeWhatsAppPhone(cleanPhone) || remoteJid;
 
     // Resolve senderName and matched user
     let senderName = msg.pushName || null;
@@ -101,8 +96,6 @@ export async function POST(req: NextRequest) {
       ? await db.whatsAppMessage.findUnique({ where: { providerMessageId } })
       : null;
     if (existingInbound) return NextResponse.json({ success: true, duplicate: true });
-
-    shouldEmitWhatsAppRefresh = true;
 
     // Supplier replies belong to Daily Procurement before the generic ERP chatbot.
     if (matchedSupplier) {
@@ -697,12 +690,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     return handleApiError(err);
-  } finally {
-    if (shouldEmitWhatsAppRefresh && realtimePhone) {
-      emitWhatsAppMessageChanged({
-        phone: realtimePhone,
-        reason: 'created',
-      });
-    }
   }
 }
