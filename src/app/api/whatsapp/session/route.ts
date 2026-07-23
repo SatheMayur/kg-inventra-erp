@@ -3,6 +3,9 @@ import { db } from '@/lib/db'
 import { authorize } from '@/lib/auth'
 import { handleApiError } from '@/lib/api-utils'
 import QRCode from 'qrcode'
+import { emitWhatsAppSessionChanged } from '@/lib/realtime'
+
+const BRIDGE_HEALTH_URL = process.env.BRIDGE_HEALTH_URL || 'http://localhost:4016'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,110 +14,146 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
+    // Direct health check probe to local bridge process HTTP listener
+    let bridgeAlive = false
+    let bridgeData: any = null
+    try {
+      const probeRes = await fetch(`${BRIDGE_HEALTH_URL}/status`, {
+        signal: AbortSignal.timeout(1500),
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      if (probeRes.ok) {
+        bridgeAlive = true
+        bridgeData = await probeRes.json()
+      }
+    } catch (err) {
+      bridgeAlive = false
+    }
+
     const session = await db.whatsAppSession.findUnique({
       where: { id: 'default' }
     })
 
-    if (!session) {
+    if (!session && !bridgeAlive) {
       return NextResponse.json({
         status: 'DISCONNECTED',
+        bridgeAlive: false,
         qrCode: null,
         qrDataUrl: null,
         reconnects: 0,
-        message: 'No WhatsApp session initialized.'
+        message: 'WhatsApp bridge service is not running.'
       })
     }
 
-    const ageMs = Date.now() - new Date(session.updatedAt).getTime()
+    // If bridge is alive, let bridge status take precedence if DB is stale
+    const currentStatus = (bridgeAlive && bridgeData?.connected) ? 'CONNECTED' : (session?.status || 'DISCONNECTED')
+    const currentQr = session?.qrCode || null
+    const ageMs = session ? Date.now() - new Date(session.updatedAt).getTime() : 999999
 
     // 1. Relink command issued but bridge has not picked it up or reported status yet
-    if (session.command === 'RELINK') {
-      if (ageMs < 30000) {
+    if (session?.command === 'RELINK') {
+      if (bridgeAlive) {
         return NextResponse.json({
-          status: 'STARTING',
+          status: bridgeData?.state || 'STARTING',
+          bridgeAlive: true,
           qrCode: null,
           qrDataUrl: null,
           reconnects: session.reconnects,
           message: 'Initializing WhatsApp bridge and requesting QR code...'
         })
-      } else {
+      } else if (ageMs < 30000) {
         return NextResponse.json({
-          status: 'ERROR',
+          status: 'STARTING',
+          bridgeAlive: false,
           qrCode: null,
           qrDataUrl: null,
           reconnects: session.reconnects,
-          message: 'WhatsApp bridge service is not responding. Ensure bridge process is running.'
+          message: 'Initializing WhatsApp bridge process...'
+        })
+      } else {
+        return NextResponse.json({
+          status: 'SERVICE_OFFLINE',
+          bridgeAlive: false,
+          qrCode: null,
+          qrDataUrl: null,
+          reconnects: session.reconnects,
+          message: 'WhatsApp bridge service is not running. Launch start-whatsapp.bat'
         })
       }
     }
 
     // 2. Connected state
-    if (session.status === 'CONNECTED') {
+    if (currentStatus === 'CONNECTED' || (bridgeAlive && bridgeData?.connected)) {
       return NextResponse.json({
         status: 'CONNECTED',
+        bridgeAlive: true,
+        connectedPhone: bridgeData?.connectedPhone || null,
         qrCode: null,
         qrDataUrl: null,
-        reconnects: session.reconnects,
-        message: 'WhatsApp bridge connected successfully.'
+        reconnects: session?.reconnects || 0,
+        message: bridgeData?.connectedPhone ? `Connected as +${bridgeData.connectedPhone}` : 'WhatsApp bridge connected successfully.'
       })
     }
 
     // 3. Connecting / Pairing state
-    if (session.status === 'CONNECTING') {
-      if (session.qrCode) {
-        if (ageMs <= 60000) {
+    if (currentStatus === 'CONNECTING' || (bridgeAlive && (bridgeData?.state === 'PAIRING_REQUIRED' || bridgeData?.state === 'QR_READY'))) {
+      if (currentQr) {
+        if (ageMs <= 60000 || bridgeAlive) {
           let qrDataUrl: string | null = null
           try {
-            qrDataUrl = await QRCode.toDataURL(session.qrCode)
+            qrDataUrl = await QRCode.toDataURL(currentQr)
           } catch (qrErr) {
             console.error('Failed to generate QR data URL:', qrErr)
           }
 
           return NextResponse.json({
             status: 'PAIRING_REQUIRED',
-            qrCode: session.qrCode,
+            bridgeAlive,
+            qrCode: currentQr,
             qrDataUrl,
-            reconnects: session.reconnects,
+            reconnects: session?.reconnects || 0,
             message: 'Scan the QR code with WhatsApp on your phone.'
           })
         } else {
-          // QR code has expired (>60s old)
           return NextResponse.json({
             status: 'QR_EXPIRED',
+            bridgeAlive,
             qrCode: null,
             qrDataUrl: null,
-            reconnects: session.reconnects,
+            reconnects: session?.reconnects || 0,
             message: 'QR code expired. Please click Regenerate QR Code.'
           })
         }
       } else {
-        // Connecting state without QR code
-        if (ageMs < 30000) {
+        if (ageMs < 30000 || bridgeAlive) {
           return NextResponse.json({
             status: 'STARTING',
+            bridgeAlive,
             qrCode: null,
             qrDataUrl: null,
-            reconnects: session.reconnects,
+            reconnects: session?.reconnects || 0,
             message: 'Initializing WhatsApp bridge and requesting QR code...'
           })
         } else {
           return NextResponse.json({
-            status: 'ERROR',
+            status: 'SERVICE_OFFLINE',
+            bridgeAlive: false,
             qrCode: null,
             qrDataUrl: null,
-            reconnects: session.reconnects,
-            message: 'Bridge initialization timed out. Ensure bridge process is running.'
+            reconnects: session?.reconnects || 0,
+            message: 'Bridge service is offline. Ensure start-whatsapp.bat is running.'
           })
         }
       }
     }
 
     return NextResponse.json({
-      status: 'DISCONNECTED',
+      status: bridgeAlive ? (bridgeData?.state || 'DISCONNECTED') : 'SERVICE_OFFLINE',
+      bridgeAlive,
       qrCode: null,
       qrDataUrl: null,
-      reconnects: session.reconnects,
-      message: 'WhatsApp is currently disconnected.'
+      reconnects: session?.reconnects || 0,
+      message: bridgeAlive ? 'WhatsApp is currently disconnected.' : 'WhatsApp bridge service is not running.'
     })
   } catch (error) {
     return handleApiError(error)
@@ -128,15 +167,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
-    const userRole = auth.user?.role
-    if (userRole !== 'admin' && userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
+    const userRole = String(auth.user?.role || '').toUpperCase()
+    if (userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()
     const { command } = body
 
-    if (command === 'RELINK') {
+    if (command === 'RELINK' || command === 'RESET_SESSION') {
+      if (command === 'RESET_SESSION') {
+        try {
+          await fetch(`${BRIDGE_HEALTH_URL}/api/reset-session`, {
+            method: 'POST',
+            signal: AbortSignal.timeout(2000)
+          }).catch(() => {})
+        } catch (e) {}
+      }
+
       await db.whatsAppSession.upsert({
         where: { id: 'default' },
         create: {
@@ -151,6 +199,20 @@ export async function POST(request: NextRequest) {
           qrCode: null,
           updatedAt: new Date()
         }
+      })
+
+      // Also directly notify local bridge health listener if alive
+      try {
+        await fetch(`${BRIDGE_HEALTH_URL}/api/restart`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(1500)
+        }).catch(() => {})
+      } catch (e) {}
+
+      emitWhatsAppSessionChanged({
+        status: 'STARTING',
+        qrAvailable: false,
+        reason: 'relink-requested',
       })
 
       return NextResponse.json({ success: true, status: 'STARTING', message: 'Relink command issued successfully' })

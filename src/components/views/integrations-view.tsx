@@ -23,6 +23,7 @@ import {
   Eye,
   EyeOff,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1087,8 +1088,11 @@ function WhatsAppConnectionCard() {
   const [sessionStatus, setSessionStatus] = useState<string>('DISCONNECTED')
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string>('')
+  const [connectedPhone, setConnectedPhone] = useState<string | null>(null)
+  const [bridgeAlive, setBridgeAlive] = useState<boolean>(false)
   const [loadingSession, setLoadingSession] = useState(true)
   const [relinking, setRelinking] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   async function fetchSession() {
     try {
@@ -1098,6 +1102,8 @@ function WhatsAppConnectionCard() {
         setSessionStatus(data.status || 'DISCONNECTED')
         setQrCodeDataUrl(data.qrDataUrl || null)
         setStatusMessage(data.message || '')
+        setConnectedPhone(data.connectedPhone || null)
+        setBridgeAlive(Boolean(data.bridgeAlive))
       }
     } catch (e) {
       console.error(e)
@@ -1128,14 +1134,39 @@ function WhatsAppConnectionCard() {
     }
   }
 
+  async function handleResetSession() {
+    if (!confirm('Are you sure you want to reset the WhatsApp session? You will need to re-scan a new QR code.')) return
+    setResetting(true)
+    try {
+      const res = await fetch('/api/whatsapp/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: 'RESET_SESSION' }),
+      })
+      if (res.ok) {
+        toast.success('Session reset successfully. Initializing new QR code...')
+        setQrCodeDataUrl(null)
+        await fetchSession()
+      } else {
+        toast.error('Failed to reset session')
+      }
+    } catch (err) {
+      toast.error('Error resetting session')
+    } finally {
+      setResetting(false)
+    }
+  }
+
   useEffect(() => {
     fetchSession()
     const interval = setInterval(fetchSession, 3000)
     return () => clearInterval(interval)
   }, [])
 
-  const isPairing = sessionStatus === 'PAIRING_REQUIRED' || (sessionStatus === 'CONNECTING' && Boolean(qrCodeDataUrl))
+  const isPairing = sessionStatus === 'PAIRING_REQUIRED' || sessionStatus === 'QR_READY' || (sessionStatus === 'CONNECTING' && Boolean(qrCodeDataUrl))
   const isStarting = sessionStatus === 'STARTING' || (sessionStatus === 'CONNECTING' && !qrCodeDataUrl)
+  const isConnected = sessionStatus === 'CONNECTED'
+  const isOffline = sessionStatus === 'SERVICE_OFFLINE' || sessionStatus === 'ERROR' || (!bridgeAlive && !isConnected && !isPairing)
 
   return (
     <Card className="border-border/50 bg-card shadow-lg relative overflow-hidden">
@@ -1152,45 +1183,62 @@ function WhatsAppConnectionCard() {
               <p className="text-xs text-muted-foreground">Operational WhatsApp Web bridge session status and device authentication.</p>
             </div>
           </div>
-          <Badge
-            variant="outline"
-            className={`capitalize font-bold text-xs px-3 py-1 ${
-              sessionStatus === 'CONNECTED' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' :
-              isPairing || isStarting ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' :
-              'bg-rose-500/10 text-rose-600 border-rose-500/30'
-            }`}
-          >
-            <span className={`size-2 rounded-full mr-1.5 inline-block ${
-              sessionStatus === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' :
-              isPairing || isStarting ? 'bg-amber-500 animate-pulse' :
-              'bg-rose-500'
-            }`} />
-            {sessionStatus === 'PAIRING_REQUIRED' ? 'Pairing Required' : sessionStatus.replaceAll('_', ' ').toLowerCase()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchSession}
+              disabled={loadingSession}
+              className="h-8 px-2 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+              title="Recheck Bridge Liveness & Health"
+            >
+              <RefreshCw className={`size-3.5 mr-1 ${loadingSession ? 'animate-spin' : ''}`} />
+              Recheck Health
+            </Button>
+            <Badge
+              variant="outline"
+              className={`capitalize font-bold text-xs px-3 py-1 ${
+                isConnected ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' :
+                isPairing || isStarting ? 'bg-amber-500/10 text-amber-600 border-amber-500/30' :
+                'bg-rose-500/10 text-rose-600 border-rose-500/30'
+              }`}
+            >
+              <span className={`size-2 rounded-full mr-1.5 inline-block ${
+                isConnected ? 'bg-emerald-500 animate-pulse' :
+                isPairing || isStarting ? 'bg-amber-500 animate-pulse' :
+                'bg-rose-500'
+              }`} />
+              {sessionStatus === 'PAIRING_REQUIRED' ? 'Pairing Required' :
+               sessionStatus === 'SERVICE_OFFLINE' ? 'Service Offline' :
+               sessionStatus.replaceAll('_', ' ').toLowerCase()}
+            </Badge>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
-        {sessionStatus === 'CONNECTED' && (
+        {isConnected && (
           <div className="space-y-4">
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start gap-3">
               <CheckCircle2 className="size-5 text-emerald-500 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Session Linked & Authenticated</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                  Session Linked & Authenticated {connectedPhone ? `(+${connectedPhone})` : ''}
+                </h4>
+                <p className="text-xs text-muted-foreground">
                   The production WhatsApp bridge is connected. Inbound messages from vendors are recorded automatically, and outbound Daily Procurement requirements send live.
                 </p>
               </div>
             </div>
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleRelink}
-                disabled={relinking}
+                onClick={handleResetSession}
+                disabled={resetting || relinking}
                 className="text-xs font-semibold text-rose-600 border-rose-500/30 hover:bg-rose-500/10 gap-1.5"
               >
-                {relinking ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                Disconnect / Reset Session
+                {resetting ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                Reset Session & Re-pair
               </Button>
             </div>
           </div>
@@ -1232,7 +1280,7 @@ function WhatsAppConnectionCard() {
                 Initializing WhatsApp Bridge...
               </p>
               <p className="text-[11px] text-muted-foreground max-w-xs">
-                {statusMessage || 'Requesting QR code from WhatsApp Web servers...'}
+                {statusMessage || 'Requesting QR code from WhatsApp servers...'}
               </p>
             </div>
           </div>
@@ -1260,27 +1308,32 @@ function WhatsAppConnectionCard() {
           </div>
         )}
 
-        {(sessionStatus === 'DISCONNECTED' || sessionStatus === 'ERROR') && (
+        {isOffline && (
           <div className="space-y-4">
             <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
               <XCircle className="size-5 text-rose-500 shrink-0 mt-0.5" />
-              <div>
+              <div className="space-y-1">
                 <h4 className="text-xs font-bold text-rose-700 dark:text-rose-300">
-                  {sessionStatus === 'ERROR' ? 'Bridge Service Error / Offline' : 'Bridge Disconnected'}
+                  {sessionStatus === 'SERVICE_OFFLINE' ? 'WhatsApp Bridge Service Offline' : 'Bridge Disconnected'}
                 </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {statusMessage || 'No active WhatsApp account is linked. Click below to start pairing and generate a QR code for authenticating your device.'}
+                <p className="text-xs text-muted-foreground">
+                  {statusMessage || 'The WhatsApp bridge service is currently not running or unreachable. Please launch start-whatsapp.bat to start the bridge process.'}
                 </p>
               </div>
             </div>
-            <Button
-              onClick={handleRelink}
-              disabled={relinking}
-              className="bg-primary text-primary-foreground font-semibold text-xs gap-1.5 shadow-md shadow-primary/20"
-            >
-              {relinking ? <Loader2 className="size-3.5 animate-spin" /> : <Smartphone className="size-3.5" />}
-              Start Pairing & Generate QR
-            </Button>
+            <div className="flex items-center justify-between pt-2">
+              <div className="text-[11px] text-muted-foreground font-mono">
+                Launch command: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground">start-whatsapp.bat</code>
+              </div>
+              <Button
+                onClick={handleRelink}
+                disabled={relinking}
+                className="bg-primary text-primary-foreground font-semibold text-xs gap-1.5 shadow-md shadow-primary/20"
+              >
+                {relinking ? <Loader2 className="size-3.5 animate-spin" /> : <Smartphone className="size-3.5" />}
+                Start Pairing & Generate QR
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

@@ -59,6 +59,9 @@ public/uploads/items/*
 prisma/dev.db
 prisma/dev.db.*
 prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
+prisma/test.db
 
 # Recovered parent-repo backup (un-mix artifact)
 .git_combined_backup/

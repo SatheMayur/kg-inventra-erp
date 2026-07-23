@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { handleApiError, ApiError, validateBridgeKey } from '@/lib/api-utils';
+import { emitWhatsAppMessageChanged } from '@/lib/realtime';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,13 +14,13 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedStatus = status.toUpperCase();
-    await db.$transaction(async (tx) => {
-      await tx.whatsAppMessage.update({
-      where: { id },
-      data: { 
-        status: normalizedStatus,
-        error: error || null 
-      }
+    const updatedMessage = await db.$transaction(async (tx) => {
+      const message = await tx.whatsAppMessage.update({
+        where: { id },
+        data: {
+          status: normalizedStatus,
+          error: error || null,
+        },
       });
 
       // Delivery/read acknowledgements are transport state only. They must never
@@ -32,6 +33,16 @@ export async function POST(req: NextRequest) {
         where: { whatsappMessageId: id },
         data: { messageStatus: normalizedStatus },
       });
+
+      return message;
+    });
+
+    emitWhatsAppMessageChanged({
+      phone: updatedMessage.phone,
+      messageId: updatedMessage.id,
+      direction: updatedMessage.direction,
+      status: updatedMessage.status,
+      reason: 'status-updated',
     });
 
     return NextResponse.json({ success: true });

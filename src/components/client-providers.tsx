@@ -1,5 +1,6 @@
 'use client'
 
+import '@/lib/browser-crypto-polyfill'
 import { useEffect } from 'react'
 import { ErrorBoundary } from './error-boundary'
 import { Toaster } from 'sonner'

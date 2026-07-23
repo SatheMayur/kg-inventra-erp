@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,6 +47,7 @@ import {
 import { toast } from 'sonner'
 import { format, isToday, isYesterday } from 'date-fns'
 import { useAppStore } from '@/lib/store'
+import { getRealtimeSocket } from '@/lib/socket-client'
 
 type FilterTab = 'ALL' | 'VENDORS' | 'EMPLOYEES' | 'LINKED'
 type RightPanelTab = 'context' | 'assistant'
@@ -100,10 +101,11 @@ export default function WhatsAppInboxView() {
   const [loadingSession, setLoadingSession] = useState(true)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const activePhoneRef = useRef<string | null>(null)
 
   const isAdmin = user?.role === 'admin' || user?.role === 'STORE_ADMIN'
 
-  async function fetchSession() {
+  const fetchSession = useCallback(async () => {
     try {
       const res = await fetch('/api/whatsapp/session')
       if (res.ok) {
@@ -115,16 +117,16 @@ export default function WhatsAppInboxView() {
     } finally {
       setLoadingSession(false)
     }
-  }
+  }, [])
 
-  async function fetchThreads() {
+  const fetchThreads = useCallback(async () => {
     try {
       const res = await fetch('/api/whatsapp/messages')
       if (res.ok) {
         const data = await res.json()
         setThreads(data.threads || [])
         // Default select first thread if available and none selected
-        if (!activePhone && data.threads?.length > 0) {
+        if (!activePhoneRef.current && data.threads?.length > 0) {
           setActivePhone(data.threads[0].phone)
         }
       }
@@ -133,9 +135,9 @@ export default function WhatsAppInboxView() {
     } finally {
       setLoadingThreads(false)
     }
-  }
+  }, [])
 
-  async function fetchMessages(phone: string, isPolling = false) {
+  const fetchMessages = useCallback(async (phone: string, isPolling = false) => {
     if (!isPolling) setLoadingMessages(true)
     try {
       const res = await fetch(`/api/whatsapp/messages?phone=${phone}`)
@@ -151,26 +153,88 @@ export default function WhatsAppInboxView() {
     } finally {
       if (!isPolling) setLoadingMessages(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    activePhoneRef.current = activePhone
+  }, [activePhone])
 
   useEffect(() => {
     fetchThreads()
     fetchSession()
-    const threadsInterval = setInterval(fetchThreads, 5000)
-    const sessionInterval = setInterval(fetchSession, 3000)
-    return () => {
-      clearInterval(threadsInterval)
-      clearInterval(sessionInterval)
+
+    const socket = getRealtimeSocket()
+    let threadsInterval: ReturnType<typeof setInterval> | null = null
+    let sessionInterval: ReturnType<typeof setInterval> | null = null
+
+    const startFallbackPolling = () => {
+      if (!threadsInterval) threadsInterval = setInterval(fetchThreads, 5000)
+      if (!sessionInterval) sessionInterval = setInterval(fetchSession, 3000)
     }
-  }, [])
+
+    const stopFallbackPolling = () => {
+      if (threadsInterval) clearInterval(threadsInterval)
+      if (sessionInterval) clearInterval(sessionInterval)
+      threadsInterval = null
+      sessionInterval = null
+    }
+
+    if (!socket) {
+      startFallbackPolling()
+      return stopFallbackPolling
+    }
+
+    const handleConnect = () => {
+      stopFallbackPolling()
+      const currentPhone = activePhoneRef.current
+      if (currentPhone) socket.emit('join:whatsapp-thread', currentPhone)
+      fetchThreads()
+      fetchSession()
+    }
+
+    const handleDisconnect = () => {
+      startFallbackPolling()
+    }
+
+    const handleMessageEvent = (payload: { phone?: string | null }) => {
+      const currentPhone = activePhoneRef.current
+      fetchThreads()
+      if (currentPhone && (!payload.phone || payload.phone === currentPhone)) {
+        fetchMessages(currentPhone, true)
+      }
+    }
+
+    const handleSessionEvent = () => {
+      fetchSession()
+    }
+
+    socket.on('connect', handleConnect)
+    socket.on('disconnect', handleDisconnect)
+    socket.on('whatsapp:message', handleMessageEvent)
+    socket.on('whatsapp:session', handleSessionEvent)
+
+    if (socket.connected) {
+      handleConnect()
+    } else {
+      startFallbackPolling()
+    }
+
+    return () => {
+      socket.off('connect', handleConnect)
+      socket.off('disconnect', handleDisconnect)
+      socket.off('whatsapp:message', handleMessageEvent)
+      socket.off('whatsapp:session', handleSessionEvent)
+      stopFallbackPolling()
+    }
+  }, [fetchMessages, fetchSession, fetchThreads])
 
   useEffect(() => {
     if (activePhone) {
+      const socket = getRealtimeSocket()
+      if (socket?.connected) socket.emit('join:whatsapp-thread', activePhone)
       fetchMessages(activePhone)
-      const interval = setInterval(() => fetchMessages(activePhone, true), 3000)
-      return () => clearInterval(interval)
     }
-  }, [activePhone])
+  }, [activePhone, fetchMessages])
 
   useEffect(() => {
     if (scrollRef.current) {
