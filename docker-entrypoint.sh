@@ -12,6 +12,11 @@ if [ "$SEED_DEMO" = "true" ]; then
   node --experimental-strip-types prisma/seed-demo.ts || echo "[inventra] demo seed skipped"
 fi
 
+if [ -z "$BRIDGE_API_KEY" ]; then
+  export BRIDGE_API_KEY="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
+  echo "[inventra] BRIDGE_API_KEY was not set; generated an internal bridge key for this container"
+fi
+
 if [ "${WHATSAPP_BRIDGE_ENABLED:-true}" = "true" ]; then
   echo "[inventra] starting WhatsApp bridge worker"
   WHATSAPP_BRIDGE_APP_URL="${WHATSAPP_BRIDGE_APP_URL:-http://127.0.0.1:3000}" \
