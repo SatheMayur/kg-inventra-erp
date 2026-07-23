@@ -12,5 +12,13 @@ if [ "$SEED_DEMO" = "true" ]; then
   node --experimental-strip-types prisma/seed-demo.ts || echo "[inventra] demo seed skipped"
 fi
 
+if [ "${WHATSAPP_BRIDGE_ENABLED:-true}" = "true" ]; then
+  echo "[inventra] starting WhatsApp bridge worker"
+  WHATSAPP_BRIDGE_APP_URL="${WHATSAPP_BRIDGE_APP_URL:-http://127.0.0.1:3000}" \
+    node /app/scripts/whatsapp-bridge.mjs &
+else
+  echo "[inventra] WhatsApp bridge worker disabled"
+fi
+
 echo "[inventra] starting server on :3000"
 exec npm start
