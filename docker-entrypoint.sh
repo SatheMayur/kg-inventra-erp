@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+export PORT="${PORT:-3084}"
+
 echo "[inventra] applying schema to $DATABASE_URL"
 npx prisma db push --skip-generate
 
@@ -19,11 +21,11 @@ fi
 
 if [ "${WHATSAPP_BRIDGE_ENABLED:-true}" = "true" ]; then
   echo "[inventra] starting WhatsApp bridge worker"
-  WHATSAPP_BRIDGE_APP_URL="${WHATSAPP_BRIDGE_APP_URL:-http://127.0.0.1:3000}" \
+  WHATSAPP_BRIDGE_APP_URL="${WHATSAPP_BRIDGE_APP_URL:-http://127.0.0.1:${PORT}}" \
     node /app/scripts/whatsapp-bridge.mjs &
 else
   echo "[inventra] WhatsApp bridge worker disabled"
 fi
 
-echo "[inventra] starting server on :3000"
+echo "[inventra] starting server on :${PORT}"
 exec npm start

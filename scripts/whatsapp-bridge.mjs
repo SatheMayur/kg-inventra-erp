@@ -3,7 +3,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import makeWASocket, { DisconnectReason, useMultiFileAuthState as createMultiFileAuthState } from '@whiskeysockets/baileys'
 import pino from 'pino'
 
-const appBaseUrl = process.env.WHATSAPP_BRIDGE_APP_URL || process.env.APP_BASE_URL || 'http://127.0.0.1:3000'
+const appPort = process.env.PORT || '3084'
+const appBaseUrl = process.env.WHATSAPP_BRIDGE_APP_URL || process.env.APP_BASE_URL || `http://127.0.0.1:${appPort}`
 const bridgeKey = process.env.BRIDGE_API_KEY
 const authDir = process.env.WHATSAPP_AUTH_DIR || path.resolve(process.cwd(), 'data', 'whatsapp-auth')
 const pollIntervalMs = Number(process.env.WHATSAPP_BRIDGE_POLL_MS || 3000)

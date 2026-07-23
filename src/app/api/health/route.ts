@@ -11,6 +11,10 @@ export async function GET() {
         status: 'ok',
         timestamp: new Date().toISOString(),
         uptime: Math.floor(process.uptime()),
+        commit: process.env.APP_COMMIT_SHA || null,
+        buildTime: process.env.APP_BUILD_TIME || null,
+        port: process.env.PORT || '3084',
+        whatsappBridgeEnabled: process.env.WHATSAPP_BRIDGE_ENABLED !== 'false',
       },
       { status: 200 }
     );
