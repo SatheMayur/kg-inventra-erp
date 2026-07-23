@@ -128,8 +128,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
-    const userRole = auth.user?.role
-    if (userRole !== 'admin' && userRole !== 'ADMIN' && userRole !== 'STORE_ADMIN') {
+    const userRole = String(auth.user?.role ?? '')
+    if (!['admin', 'ADMIN', 'STORE_ADMIN'].includes(userRole)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

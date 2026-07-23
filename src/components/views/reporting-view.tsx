@@ -123,6 +123,11 @@ export default function ReportingView() {
   const [sourcingLoading, setSourcingLoading] = useState(false)
   const [sourcingLoaded, setSourcingLoaded] = useState(false)
 
+  // Daily Operations Report states
+  const [dailyOps, setDailyOps] = useState<any | null>(null)
+  const [dailyOpsLoading, setDailyOpsLoading] = useState(false)
+  const [dailyOpsLoaded, setDailyOpsLoaded] = useState(false)
+
   // Check if reporting flag is on
   const reportingEnabled = flags.reporting !== false
 
@@ -261,6 +266,19 @@ export default function ReportingView() {
     }
   }, [])
 
+  const fetchDailyOperations = useCallback(async () => {
+    try {
+      setDailyOpsLoading(true)
+      const res = await api.reporting.dailyOperations()
+      setDailyOps(res)
+      setDailyOpsLoaded(true)
+    } catch {
+      toast.error('Failed to load daily operations report')
+    } finally {
+      setDailyOpsLoading(false)
+    }
+  }, [])
+
   const exportToCSV = (data: any[], headers: string[], filename: string) => {
     if (!data || data.length === 0) {
       toast.error('No data to export')
@@ -312,6 +330,50 @@ export default function ReportingView() {
       ['poNumber', 'supplierName', 'status', 'createdAt', 'expectedDeliveryDate', 'ageInDays', 'totalAmount', 'itemName', 'orderedQty', 'receivedQty', 'pendingQty', 'unit', 'unitPrice'],
       'purchase_orders_delivery_tracking'
     )
+  }
+
+  const handleExportDailyOperations = () => {
+    if (!dailyOps) {
+      toast.error('No daily operations data to export')
+      return
+    }
+
+    const rows = [
+      ...((dailyOps.urgentActions ?? []).map((item: any) => ({
+        section: 'Urgent Action',
+        reference: item.area,
+        name: item.title,
+        status: item.severity,
+        quantity: '',
+        detail: item.detail,
+      }))),
+      ...((dailyOps.stockRiskItems ?? []).map((item: any) => ({
+        section: 'Stock Risk',
+        reference: item.category,
+        name: item.name,
+        status: item.severity,
+        quantity: `${item.available} ${item.unit}`,
+        detail: `Min ${item.minStock}; shortage ${item.shortageQty}`,
+      }))),
+      ...((dailyOps.pendingRequests ?? []).map((item: any) => ({
+        section: 'Pending Request',
+        reference: item.requestNumber,
+        name: item.employee,
+        status: item.status,
+        quantity: `${item.issuedQty}/${item.requestedQty}`,
+        detail: `${item.department}; ${item.ageInDays} day(s) old`,
+      }))),
+      ...((dailyOps.purchaseOrders ?? []).map((item: any) => ({
+        section: 'Purchase Order',
+        reference: item.poNumber,
+        name: item.supplierName,
+        status: item.status,
+        quantity: `${item.receivedQty}/${item.orderedQty}`,
+        detail: `${item.overdue ? 'Overdue' : 'Open'}; ${item.ageInDays} day(s) old`,
+      }))),
+    ]
+
+    exportToCSV(rows, ['section', 'reference', 'name', 'status', 'quantity', 'detail'], 'daily_operations_report')
   }
 
   const formatCurrency = (val: number) => 
@@ -425,6 +487,10 @@ export default function ReportingView() {
           <TabsTrigger value="po-tracking" onClick={() => { if (!poTrackingLoaded) fetchPOTracking() }}>
             <Calendar className="size-3.5 mr-1.5" />
             PO & Delivery
+          </TabsTrigger>
+          <TabsTrigger value="daily-ops" onClick={() => { if (!dailyOpsLoaded) fetchDailyOperations() }}>
+            <FileText className="size-3.5 mr-1.5" />
+            Daily Ops
           </TabsTrigger>
           <TabsTrigger value="sourcing-history" onClick={() => { if (!sourcingLoaded) fetchSourcingHistory() }}>
             <History className="size-3.5 mr-1.5" />
@@ -1402,6 +1468,216 @@ export default function ReportingView() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="daily-ops" className="space-y-4">
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="size-4 text-primary" />
+                Daily Operations Control Report
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={fetchDailyOperations} disabled={dailyOpsLoading}>
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportDailyOperations}
+                  disabled={dailyOpsLoading || !dailyOps}
+                  className="gap-1.5"
+                >
+                  <FileDown className="size-3.5" />
+                  Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {dailyOpsLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-48 w-full" />
+                </div>
+              ) : !dailyOps ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <FileText className="mb-2 size-8 opacity-30" />
+                  <p className="text-sm">Open this tab to generate today&apos;s operations report.</p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+                    {[
+                      ['Stock Risk', dailyOps.summary?.stockRiskCount ?? 0],
+                      ['Out of Stock', dailyOps.summary?.outOfStockCount ?? 0],
+                      ['Pending Requests', dailyOps.summary?.pendingRequests ?? 0],
+                      ['Open POs', dailyOps.summary?.openPurchaseOrders ?? 0],
+                      ['Overdue POs', dailyOps.summary?.overduePurchaseOrders ?? 0],
+                      ['WA Failed', dailyOps.summary?.whatsappFailed ?? 0],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-xl border border-border/50 bg-muted/10 p-3">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                        <p className="mt-1 text-2xl font-bold">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(dailyOps.urgentActions ?? []).length > 0 && (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                      <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                        <AlertTriangle className="size-4 text-amber-500" />
+                        Urgent Actions
+                      </h4>
+                      <div className="space-y-2">
+                        {dailyOps.urgentActions.map((action: any, idx: number) => (
+                          <div key={`${action.area}-${idx}`} className="rounded-lg border border-border/40 bg-background/60 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className={action.severity === 'critical' ? 'border-red-500/40 text-red-500' : 'border-amber-500/40 text-amber-500'}>
+                                {action.area}
+                              </Badge>
+                              <span className="text-sm font-semibold">{action.title}</span>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{action.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <Card className="border-border/50 bg-muted/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Stock Risk</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {(dailyOps.stockRiskItems ?? []).length === 0 ? (
+                          <p className="py-6 text-center text-sm text-muted-foreground">No stock risk found.</p>
+                        ) : (
+                          <div className="overflow-auto">
+                            <table className="w-full text-xs">
+                              <thead className="text-left text-muted-foreground">
+                                <tr className="border-b border-border/40">
+                                  <th className="pb-2 pr-3">Item</th>
+                                  <th className="pb-2 pr-3">Available</th>
+                                  <th className="pb-2 pr-3">Min</th>
+                                  <th className="pb-2">Risk</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dailyOps.stockRiskItems.map((item: any) => (
+                                  <tr key={item.id} className="border-b border-border/20 last:border-0">
+                                    <td className="py-2 pr-3 font-medium">{item.name}</td>
+                                    <td className="py-2 pr-3">{item.available} {item.unit}</td>
+                                    <td className="py-2 pr-3">{item.minStock}</td>
+                                    <td className="py-2">
+                                      <Badge variant="outline" className={item.severity === 'critical' ? 'border-red-500/40 text-red-500' : 'border-amber-500/40 text-amber-500'}>
+                                        {item.severity}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-border/50 bg-muted/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Pending Requisitions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {(dailyOps.pendingRequests ?? []).length === 0 ? (
+                          <p className="py-6 text-center text-sm text-muted-foreground">No pending requisitions.</p>
+                        ) : (
+                          <div className="overflow-auto">
+                            <table className="w-full text-xs">
+                              <thead className="text-left text-muted-foreground">
+                                <tr className="border-b border-border/40">
+                                  <th className="pb-2 pr-3">Request</th>
+                                  <th className="pb-2 pr-3">Department</th>
+                                  <th className="pb-2 pr-3">Age</th>
+                                  <th className="pb-2">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dailyOps.pendingRequests.map((request: any) => (
+                                  <tr key={request.id} className="border-b border-border/20 last:border-0">
+                                    <td className="py-2 pr-3 font-medium">{request.requestNumber}</td>
+                                    <td className="py-2 pr-3">{request.department}</td>
+                                    <td className="py-2 pr-3">{request.ageInDays}d</td>
+                                    <td className="py-2">{request.status}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className="border-border/50 bg-muted/5">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">Open Purchase Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {(dailyOps.purchaseOrders ?? []).length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">No open purchase orders.</p>
+                      ) : (
+                        <div className="overflow-auto">
+                          <table className="w-full text-xs">
+                            <thead className="text-left text-muted-foreground">
+                              <tr className="border-b border-border/40">
+                                <th className="pb-2 pr-3">PO</th>
+                                <th className="pb-2 pr-3">Supplier</th>
+                                <th className="pb-2 pr-3 text-right">Pending Qty</th>
+                                <th className="pb-2 pr-3 text-right">Amount</th>
+                                <th className="pb-2">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dailyOps.purchaseOrders.map((po: any) => (
+                                <tr key={po.id} className="border-b border-border/20 last:border-0">
+                                  <td className="py-2 pr-3 font-semibold text-primary">{po.poNumber}</td>
+                                  <td className="py-2 pr-3">{po.supplierName}</td>
+                                  <td className="py-2 pr-3 text-right">{po.pendingQty}</td>
+                                  <td className="py-2 pr-3 text-right font-semibold">{formatCurrency(Number(po.totalAmount ?? 0))}</td>
+                                  <td className="py-2">
+                                    <Badge variant="outline" className={po.overdue ? 'border-red-500/40 text-red-500' : ''}>
+                                      {po.overdue ? 'OVERDUE' : po.status}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {(dailyOps.topConsumedItems ?? []).length > 0 && (
+                    <Card className="border-border/50 bg-muted/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Today&apos;s Top Consumed Items</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-2">
+                          {dailyOps.topConsumedItems.map((item: any) => (
+                            <Badge key={`${item.itemId}-${item.itemName}`} variant="outline" className="bg-background/60">
+                              {item.itemName}: {item.qty}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               )}
             </CardContent>
